@@ -50,8 +50,16 @@ public interface BlocService {
 	 * @param id
 	 */
 	void refreshCache(String id);
-	
+	/**
+	 * 
+	 * @param ref
+	 */
 	void saveBlockRef(BlockRef ref);
-	
+	/**
+	 * 
+	 * @param chain
+	 * @param txnid
+	 * @return
+	 */
 	TxnRequest fetchTransaction(String chain, String txnid);
 }

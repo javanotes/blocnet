@@ -61,6 +61,21 @@ public class HashUtil {
 		digestor.update(toBytes(block.getNonce()));
 		return encodeHex(digestor.digest());
 	}
+	private static String getHash0(String data, String prevHash, long generateNonce) {
+		MessageDigest digestor = digestors.get();
+		digestor.reset();
+		digestor.update(data.getBytes(StandardCharsets.UTF_8));
+		digestor.update(prevHash.getBytes(StandardCharsets.UTF_8));
+		digestor.update(toBytes(generateNonce == -1 ? Math.abs(nonceGen.nextLong()) : generateNonce));
+		return encodeHex(digestor.digest());
+	}
+	public static void main(String[] args) {
+		if(args.length != 3) {
+			System.out.println("invalid input len - "+args.length);
+			return;
+		}
+		System.out.println(getHash0(args[0], args[1], Long.parseLong(args[2])));
+	}
 	/**
 	 * Simple hashing with no challenge. Can be used for use case PoC
 	 * @param block

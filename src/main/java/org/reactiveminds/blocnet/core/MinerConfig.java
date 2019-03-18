@@ -1,10 +1,13 @@
-package org.reactiveminds.blocnet;
+package org.reactiveminds.blocnet.core;
 
 import java.io.IOException;
 import java.net.URL;
 
+import org.reactiveminds.blocnet.Bootstrap;
+import org.reactiveminds.blocnet.api.BlocMiner;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +23,13 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 
 @Configuration
-class HazelcastConfig {
+@ConditionalOnProperty(name = "blocnet.miner", havingValue="true")
+class MinerConfig {
+
+	@Bean
+	BlocMiner miner() {
+		return new BlocMinerRunner();
+	}
 	
 	@Value("${chains.hazelcast.config:}")
 	private String configXml;
@@ -48,6 +57,7 @@ class HazelcastConfig {
 	@Bean
 	public HazelcastInstance hazelcastInstance()
 			throws IOException {
+		Bootstrap.LOG.info("Node starting as MINER ..");
 		Resource config = null;
 		boolean hasConfigXml = false;
 		if(StringUtils.hasText(configXml)) {
@@ -72,5 +82,6 @@ class HazelcastConfig {
 		}
 		return Hazelcast.newHazelcastInstance(conf);
 	}
-
+	
+	
 }

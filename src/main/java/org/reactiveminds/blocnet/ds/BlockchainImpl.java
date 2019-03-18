@@ -7,10 +7,11 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.reactiveminds.blocnet.Server;
+import org.reactiveminds.blocnet.Bootstrap;
 import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.utils.InvalidBlockException;
 import org.reactiveminds.blocnet.utils.InvalidChainException;
+import org.springframework.util.Assert;
 /**
  * A two way linked list of {@link Node}. This class is thread safe.
  * @author Sutanu_Dalui
@@ -32,7 +33,7 @@ class BlockchainImpl implements Blockchain {
 	}
 	private String challenge;
 	/**
-	 * 
+	 * Create a new chain
 	 * @param name
 	 * @param challengeLevel
 	 */
@@ -40,7 +41,7 @@ class BlockchainImpl implements Blockchain {
 		this(name, challengeLevel, new Node(GENESIS));
 	}
 	/**
-	 * 
+	 * Constructor to build an existing chain
 	 * @param name
 	 * @param challengeLevel
 	 * @param blocks
@@ -52,18 +53,20 @@ class BlockchainImpl implements Blockchain {
 	
 	private void build(Deque<Block> blocks) {
 		Block b = blocks.poll();
+		//the first should be a genesis block
+		Assert.isTrue(HashUtil.GENESIS_PREV_HASH.equals(b.getPrevHash()), "First block is not a genesis block");
 		genesis = transform(b);
-		Node prev = genesis;
+		tail = genesis;
 		Node curr;
 		while((b = blocks.poll()) != null) {
 			curr = transform(b);
-			curr.setPrevious(prev);
-			prev.setNext(curr);
-			prev = curr;
+			curr.setPrevious(tail);
+			tail.setNext(curr);
+			tail = curr;
 		}
 	}
 	/**
-	 * 
+	 * Create a new chain
 	 * @param challengeLevel
 	 */
 	BlockchainImpl(int challengeLevel) {
@@ -72,12 +75,19 @@ class BlockchainImpl implements Blockchain {
 	private BlockchainImpl(String name, int challengeLevel, Node genesis) {
 		this(name, HashUtil.toRepeatingIntString(0, challengeLevel), genesis);
 	}
+	/**
+	 * Constructor to create a new chain
+	 * @param name
+	 * @param challenge
+	 * @param genesis
+	 */
 	private BlockchainImpl(String name, String challenge, Node genesis) {
 		super();
+		Assert.isTrue(HashUtil.GENESIS_PREV_HASH.equals(genesis.getPreviousHash()), "First block is not a genesis block");
 		chainName = name;
 		this.genesis = genesis;
 		this.challenge = challenge;
-		HashUtil.generateHash(genesis, challenge, Server.newTimeCheckBean());
+		HashUtil.generateHash(genesis, challenge, Bootstrap.newTimeCheckBean());
 		tail = genesis;
 	}
 	
@@ -107,9 +117,9 @@ class BlockchainImpl implements Blockchain {
 	public Node mine(String data) throws TimeoutException {
 		Node b = new Node(data);
 		b.setPrevious(tail);
-		boolean done = HashUtil.generateHash(b, challenge, Server.newTimeCheckBean());
+		boolean done = HashUtil.generateHash(b, challenge, Bootstrap.newTimeCheckBean());
 		if(!done)
-			throw new TimeoutException("append failed! Max iteration exceeded - "+Server.newTimeCheckBean());
+			throw new TimeoutException("Mining unsuccessful. Max iteration exceeded - "+Bootstrap.newTimeCheckBean());
 		
 		return b;
 	}
@@ -126,6 +136,7 @@ class BlockchainImpl implements Blockchain {
 		tail.setNext(next);
 		tail = next;
 		size.incrementAndGet();
+		
 		return this;
 	}
 	private String print() {
@@ -138,10 +149,7 @@ class BlockchainImpl implements Blockchain {
 		
 		return s.toString();
 	}
-	public String toJson() {
-		return "";
-		
-	}
+	
 	/* (non-Javadoc)
 	 * @see org.reactiveminds.hazelblock.ds.IBlockchain#verify()
 	 */
@@ -156,12 +164,12 @@ class BlockchainImpl implements Blockchain {
 		}
 		return true;
 	}
+	
 	/*@Deprecated
 	private void mess_it() {
 		tail.setData("changed");
 	}
-	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws TimeoutException {
 		BlockchainImpl b = new BlockchainImpl("TRANS_BLOC", 4);
 		Node bloc = b.mine("Tom");
 		b.append(bloc);
@@ -175,6 +183,8 @@ class BlockchainImpl implements Blockchain {
 		b.mess_it();
 		System.out.println("is valid chain ? "+b.verify());
 	}*/
+	
+	
 	/* (non-Javadoc)
 	 * @see org.reactiveminds.hazelblock.ds.IBlockchain#getMaxSize()
 	 */
@@ -225,7 +235,7 @@ class BlockchainImpl implements Blockchain {
 		block.setChain(getChainName());
 		return block;
 	}
-	private Node transform(Block bloc) {
+	private static Node transform(Block bloc) {
 		Node block = new Node();
 		block.setData(new String(bloc.getPayload(), StandardCharsets.UTF_8));
 		block.setHash(bloc.getCurrHash());

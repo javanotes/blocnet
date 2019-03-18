@@ -24,6 +24,8 @@ import org.reactiveminds.blocnet.utils.InvalidBlockException;
 import org.reactiveminds.blocnet.utils.InvalidChainException;
 import org.reactiveminds.blocnet.utils.MiningTimeoutException;
 import org.reactiveminds.blocnet.utils.SerdeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,9 +37,16 @@ import com.hazelcast.core.IMap;
 @Service
 class ServiceImpl implements BlocService {
 
+	private static final Logger log = LoggerFactory.getLogger("BlocService");
 	private final ConcurrentMap<String, Blockchain> chainCache = new ConcurrentHashMap<>();
-	
-	private Blockchain load(String name, boolean autocreate) {
+	/**
+	 * Loads from data store and verifies the chain as well.
+	 * @param name
+	 * @param autocreate
+	 * @return
+	 * @throws InvalidChainException
+	 */
+	private Blockchain load(String name, boolean autocreate) throws InvalidChainException {
 		Deque<Block> loaded = db.loadChain(name);
 		Blockchain b;
 		
@@ -47,7 +56,7 @@ class ServiceImpl implements BlocService {
 				db.save(b);
 			}
 			else
-				return Blockchain.emptyChain();
+				b = Blockchain.emptyChain();
 		}
 		else
 			b = Blockchain.buildInstance(name, challengeLevel, loaded);
@@ -91,7 +100,9 @@ class ServiceImpl implements BlocService {
 	public String addTransaction(AddRequest request) {
 		HazelcastInstance hazel = beans.getBean(HazelcastInstance.class);
 		String txnId = Long.toHexString(hazelcast.getFlakeIdGenerator(request.getChainId()).newId());
-		hazel.getMap(BlocMinerRunner.MEMPOOL).set(txnId, request);
+		TxnRequest txn = new TxnRequest(txnId, request);
+		hazel.getMap(BlocMinerRunner.MEMPOOL).set(txn.getPartitionKey(), txn);
+		
 		return txnId;
 		
 	}
@@ -111,17 +122,18 @@ class ServiceImpl implements BlocService {
 	}
 	@Override
 	public Block appendBlock(String chain, Node n) throws InvalidBlockException, InvalidChainException {
-		//refreshCache(chain);
 		Blockchain b = getOrLoad(chain);
 		b.append(n);
+		b.verify();
+		log.info("Commit append: "+b);
 		Block appended = b.getLast();
 		db.save(appended);
 		return appended;
 	}
 
 	@Override
-	public void refreshCache(String id) {
-		chainCache.replace(id, load(id, false));
+	public void refreshCache(String chain) {
+		chainCache.replace(chain, load(chain, false));
 	}
 
 	@Override

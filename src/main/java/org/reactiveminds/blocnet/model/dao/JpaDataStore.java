@@ -47,8 +47,6 @@ class JpaDataStore implements DataStore {
 		if(blocks == null || blocks.isEmpty())
 			return new LinkedList<>();
 		
-		log.debug("Blocks: "+blocks);
-		
 		Map<String, Block> mapped = blocks.stream().collect(Collectors.toMap(Block::getPrevHash, Function.identity()));
 		Block genesis = mapped.get(HashUtil.GENESIS_PREV_HASH);
 		if(genesis == null)
@@ -61,10 +59,12 @@ class JpaDataStore implements DataStore {
 			genesis = mapped.get(genesis.getCurrHash());
 			linked.add(genesis);
 		}
+		log.info("Linked blocks: "+linked);
 		return linked;
 	}
 	@Override
 	public void save(Block bloc) {
+		log.info("Saving bloc: "+bloc);
 		repo.save(bloc);
 	}
 	@Override

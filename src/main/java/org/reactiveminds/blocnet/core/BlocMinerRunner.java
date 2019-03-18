@@ -1,9 +1,10 @@
 package org.reactiveminds.blocnet.core;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.io.Serializable;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -11,6 +12,7 @@ import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
 
+import org.reactiveminds.blocnet.api.BlocMiner;
 import org.reactiveminds.blocnet.api.BlocService;
 import org.reactiveminds.blocnet.ds.Node;
 import org.reactiveminds.blocnet.dto.AddRequest;
@@ -28,24 +30,33 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
 
-import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.Message;
 import com.hazelcast.core.MessageListener;
-import com.hazelcast.map.listener.EntryAddedListener;
-import com.hazelcast.map.listener.EntryUpdatedListener;
 import com.hazelcast.query.Predicate;
 
-@Component
-class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUpdatedListener<String, AddRequest>{
+class BlocMinerRunner implements BlocMiner{
 
+	private class CommitListener implements MessageListener<BlockData>, Serializable{
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		public void onMessage(Message<BlockData> message) {
+			updateLocalMempool(message.getMessageObject());
+		}
+		private void updateLocalMempool(BlockData mpool) {
+			service.refreshCache(mpool.getChain());
+			log.info("New block notification processed for chain - "+mpool.getChain());
+		}
+	}
 	private static final Logger log = LoggerFactory.getLogger("BlockMinerRunner");
-	public static final String MEMPOOL = "MEMPOOL";
-	public static final String COMMITNOTIF = "COMMITNOTIF";
+	
 	@Value("${chain.mine.awaitChainLockSecs:10}")
 	private long awaitChainLock;
 	@Autowired
@@ -58,44 +69,33 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 	
 	@Autowired
 	BlocService service;
-	private final List<TxnRequest> localMemPool = Collections.synchronizedList(new ArrayList<>());
 	
-	private IMap<String, AddRequest> globalMemPool() {
-		return hazelcast.<String, AddRequest>getMap(MEMPOOL);
+	private IMap<String, TxnRequest> globalMemPool() {
+		return hazelcast.<String, TxnRequest>getMap(MEMPOOL);
 	}
 	private void setupCommitListener() {
-		hazelcast.<BlockData>getTopic(COMMITNOTIF).addMessageListener(new MessageListener<BlockData>() {
-					
-					@Override
-					public void onMessage(Message<BlockData> message) {
-						updateLocalMempool(message.getMessageObject());
-					}
-		});
+		hazelcast.<BlockData>getTopic(COMMITNOTIF).addMessageListener(new CommitListener());
 	}
-	private void setupMempool() {
-		List<TxnRequest> allRequests = globalMemPool().entrySet(new Predicate<String, AddRequest>() {
-			private static final long serialVersionUID = 1L;
-
-			@Override
-			public boolean apply(Entry<String, AddRequest> mapEntry) {
-				return true;
-			}
-		}).parallelStream().map(e -> new TxnRequest(e.getKey(), e.getValue())).collect(Collectors.toList());
+	private TxnRequest mempoolEntry(String key) {
+		return Optional.ofNullable(globalMemPool().get(key)).orElse(new TxnRequest(key, new AddRequest()));
+	}
+	private List<TxnRequest> snapshotMempool() {
 		
-		localMemPool.addAll(allRequests);
+		return globalMemPool().localKeySet().stream().map(s -> mempoolEntry(s))
+				.collect(Collectors.toList());
 	}
+	
 	@PostConstruct
 	private void onStart() {
-		setupMempool();
-		globalMemPool().addEntryListener(this, true);
 		setupCommitListener();
+		log.info("Mine worker ready to slog ..");
 	}
 	
 	private int maxBlockElements;
 	
 	private boolean isCommitThresholdReached() {
 		//TODO isCommitThresholdReached
-		return !localMemPool.isEmpty();
+		return !globalMemPool().isEmpty();
 		
 	}
 	
@@ -103,40 +103,55 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 
 		protected MiningTask(String t, List<TxnRequest> u) {
 			super();
-			this.t = t;
-			this.u = u;
+			this.chain = t;
+			this.requests = u;
+			
+			if (log.isDebugEnabled()) {
+				log.debug("Requests for chain: " + chain + "\n\t" + requests);
+			}
 		}
 
-		final String t;
-		final List<TxnRequest> u;
-
+		final String chain;
+		final List<TxnRequest> requests;
+		
 		@Override
 		public void run() {
-			BlockData chainPool = new BlockData(u);
-			chainPool.setChain(t);
+			BlockData chainPool = new BlockData(requests);
+			chainPool.setChain(chain);
 			Node minedBloc;
 			try 
 			{
 				String blockData = SerdeUtil.toJson(chainPool);
-				//mine next block
-				minedBloc = service.mineBlock(t, blockData);
-				log.info("["+t+"] Found golden nonce");
+				// mine next block
+				service.refreshCache(chain);
+				minedBloc = service.mineBlock(chain, blockData);
+				log.info("["+chain+"] Found golden nonce");
 				
-				//if mined, commit block
-				//synchronize for this chain
-				ILock lock = hazelcast.getLock(t);
+				// if mined, commit block
+				
+				// not providing a cluster wide synchronization (?)
+				// since each node will be mining on its own share (Hz local entries)
+				// for the DB commit, we are using strongly consistent RDBMS and thus
+				// looking on read committed isolation before saving it
+				
+				// when using am eventually consistent store like Cassandra, the DB write
+				// at least might need to be synchronized cluster wide
+				boolean commit = false;
+				ILock lock = hazelcast.getLock(chain);
 				if(lock.tryLock(awaitChainLock, TimeUnit.SECONDS)) {
 					try {
-						commitBlock(t, minedBloc, chainPool);
-						log.info("["+t+"] New block append succesful ");
-						removeMempool(chainPool);
-						broadcastCommit(chainPool);
+						commitBlock(chain, minedBloc, chainPool);
+						commit = true;
+						log.info("["+chain+"] New block append succesful ");
 					}
 					finally {
 						lock.unlock();
 					}
 				}
-				
+				if(commit) {
+					removeMempool(chainPool);
+					broadcastCommit(chainPool);
+				}
 			} 
 			catch (MiningTimeoutException e) {
 				log.info(e.getMessage());
@@ -145,7 +160,8 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 			catch (InvalidBlockException e) {
 				log.info(e.getMessage());
 				log.debug("Append block failure", e);
-			} catch (InterruptedException e) {
+			} 
+			catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 			catch (Exception e) {
@@ -154,8 +170,9 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 		}
 
 		private void removeMempool(BlockData chainPool) {
-			Set<String> keys = chainPool.getRequests().stream().map(t -> t.getChain()+"."+t.getTxnId()).collect(Collectors.toSet());
-			globalMemPool().removeAll(new Predicate<String, AddRequest>() {
+			//remove the committed transactions from the global mempool
+			Set<TxnRequest> keys = new HashSet<>(chainPool.getRequests());
+			globalMemPool().removeAll(new Predicate<String, TxnRequest>() {
 
 				/**
 				 * 
@@ -163,14 +180,18 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 				private static final long serialVersionUID = 1L;
 
 				@Override
-				public boolean apply(Entry<String, AddRequest> mapEntry) {
-					return keys.contains(mapEntry.getValue().getChainId()+"."+mapEntry.getKey());
+				public boolean apply(Entry<String, TxnRequest> mapEntry) {
+					return keys.contains(mapEntry.getValue());
 				}
 			});
 		}
 		
 	}
 	
+	/* (non-Javadoc)
+	 * @see org.reactiveminds.blocnet.core.BlocMiner#miningTask()
+	 */
+	@Override
 	@Scheduled(fixedDelayString = "${chains.mine.schedulePeriod:PT30S}")
 	public final void miningTask() {
 		if(!isCommitThresholdReached())
@@ -178,9 +199,9 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 		
 		//get the current mempool
 		BlockData blocData; 
-		synchronized (localMemPool) {
-			blocData = new BlockData(localMemPool);
-		}
+		//take the local entries as your snapshot
+		blocData = new BlockData(snapshotMempool());
+		
 		//mine for each chain available
 		blocData.groupByChain().forEach(new BiConsumer<String, List<TxnRequest>>() {
 
@@ -190,18 +211,14 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 			}
 		});
 	}
-	private void updateLocalMempool(BlockData mpool) {
-		localMemPool.removeAll(mpool.getRequests());
-		service.refreshCache(mpool.getChain());
-		log.info("New block notification processed for chain - "+mpool.getChain());
-	}
+	
 	private void broadcastCommit(BlockData mpool) {
-		//broadcast is fire and forget
-		//the winner node does not really wait for acks
-		//this is a private network, hence 'trusted' peers
-		//worst case, if for a peer the local mempool is still not updated and is successful in mining a block
-		//the append would fail, as the previous block has already been committed
-		//we are keeping a race condition so as to who can write next block to persistent storage first
+		// broadcast is fire and forget
+		// the winner node does not really wait for acks
+		// this is a private network, hence 'trusted' peers
+		// worst case, if for a peer the local mempool is still not updated and is successful in mining a block
+		// the append would fail, as the previous block has already been committed
+		// we are keeping a race condition so as to who can write next block to persistent storage first
 		hazelcast.<BlockData>getTopic(COMMITNOTIF).publish(mpool);
 		
 	}
@@ -211,7 +228,11 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 		// link the next block
 		
 		// this will be a cluster wide synchronized operation
-		// as this is the only write path
+		// as this is the only write path. we are relying on the
+		// underlying database to give us a consistent state of
+		// data (read committed). So that would help us to resolve
+		// a race condition, and only one of the mining node
+		// will be able to append the next block.
 		Block bloc = service.appendBlock(chainId, minedBloc);
 		
 		chainPool.getRequests().stream().map(TxnRequest::getTxnId).forEach(txn -> {
@@ -228,16 +249,12 @@ class BlocMinerRunner implements EntryAddedListener<String, AddRequest>, EntryUp
 	public int getMaxBlockElements() {
 		return maxBlockElements;
 	}
+	/* (non-Javadoc)
+	 * @see org.reactiveminds.blocnet.core.BlocMiner#setMaxBlockElements(int)
+	 */
+	@Override
 	public void setMaxBlockElements(int maxBlockElements) {
 		this.maxBlockElements = maxBlockElements;
 	}
-	@Override
-	public void entryUpdated(EntryEvent<String, AddRequest> event) {
-		this.entryAdded(event);
-	}
-	@Override
-	public void entryAdded(EntryEvent<String, AddRequest> event) {
-		localMemPool.add(new TxnRequest(event.getKey(), event.getValue()));
-		log.info("Added txn to mempool: "+SerdeUtil.toJson(event.getValue()));
-	}
+	
 }

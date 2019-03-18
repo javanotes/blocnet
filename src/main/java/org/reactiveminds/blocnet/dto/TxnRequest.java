@@ -2,12 +2,18 @@ package org.reactiveminds.blocnet.dto;
 
 import java.io.IOException;
 
+import com.hazelcast.core.PartitionAware;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.DataSerializable;
 
-public class TxnRequest implements DataSerializable{
+public class TxnRequest implements DataSerializable, PartitionAware<String>{
 	
+	@Override
+	public String toString() {
+		return "[txnId=" + txnId + ", request=" + request + ", chain=" + chain + "]";
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -75,6 +81,11 @@ public class TxnRequest implements DataSerializable{
 		request = in.readUTF();
 		chain = in.readUTF();
 		txnId = in.readUTF();
+	}
+	public static final char KEY_SEP = '#';
+	@Override
+	public String getPartitionKey() {
+		return getChain()+KEY_SEP+getTxnId();
 	}
 	
 }

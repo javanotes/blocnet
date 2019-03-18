@@ -11,15 +11,17 @@ import org.springframework.stereotype.Repository;
 public interface BlockRepository extends CrudRepository<Block, Long> {
 
 	@Query(value = "SELECT a.curr_hash " + 
-			"FROM block a " + 
+			"FROM blockchains a " + 
 			"INNER JOIN " + 
-			"block b ON a.prev_hash=b.curr_hash ORDER BY a.id DESC limit 1", nativeQuery = true)
+			"blockchains b ON a.prev_hash=b.curr_hash ORDER BY a.id DESC limit 1", nativeQuery = true)
 	String findLastHash();
-	/**
-	 * 
-	 * @param chain
-	 * @return
-	 */
+	
+	@Query(value = "SELECT a.* " + 
+			"FROM blockchains a " + 
+			"INNER JOIN " + 
+			"blockchains b ON a.prev_hash=b.curr_hash and a.chain=b.chain where a.chain=? ORDER BY a.id DESC", nativeQuery = true)
+	List<Block> findByChainHierarchy(String chain);
+	
 	List<Block> findByChain(String chain);
 	/**
 	 * 
