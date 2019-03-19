@@ -47,7 +47,12 @@ class ServiceImpl implements BlocService {
 	 * @throws InvalidChainException
 	 */
 	private Blockchain load(String name, boolean autocreate) throws InvalidChainException {
-		Deque<Block> loaded = db.loadChain(name);
+		Deque<Block> loaded;
+		try {
+			loaded = db.loadChain(name);
+		} catch (IllegalStateException e) {
+			throw new InvalidChainException("Duplicate prev_hash detected", e);
+		}
 		Blockchain b;
 		
 		if((loaded == null || loaded.isEmpty())) {
@@ -72,6 +77,7 @@ class ServiceImpl implements BlocService {
 		}
 		return chainCache.get(name);
 	}
+	
 	@Autowired
 	DataStore db;
 	@Autowired
@@ -82,7 +88,7 @@ class ServiceImpl implements BlocService {
 	
 	@Override
 	public GetBlockResponse getChain(String name) {
-		Blockchain chain = load(name, false);
+		Blockchain chain = getOrLoad(name);
 		if(chain.getSize() == -1)
 		{
 			GetBlockResponse resp = new GetBlockResponse(Collections.emptyList());
@@ -125,7 +131,9 @@ class ServiceImpl implements BlocService {
 		Blockchain b = getOrLoad(chain);
 		b.append(n);
 		b.verify();
-		log.info("Commit append: "+b);
+		if (log.isDebugEnabled()) {
+			log.debug("Commit append: " + b);
+		}
 		Block appended = b.getLast();
 		db.save(appended);
 		return appended;
@@ -144,15 +152,14 @@ class ServiceImpl implements BlocService {
 	@Override
 	public TxnRequest fetchTransaction(String chain, String txnid) {
 		IMap<String, BlockRef> cache = hazelcast.getMap(BlocService.getRefTableName(chain));
-		if(cache.containsKey(txnid)) {
-			BlockRef ref = cache.get(txnid);
-			List<Block> blocs = db.loadBlock(chain, ref.getHash());
-			if(!blocs.isEmpty()) {
+		BlockRef ref = cache.get(txnid);
+		if (ref != null) {
+			List<Block> blocs = db.findBlock(chain, ref.getHash());
+			if (!blocs.isEmpty()) {
 				Block b = blocs.stream().findFirst().get();
 				BlockData data = SerdeUtil.fromBytes(b.getPayload(), BlockData.class);
 				return data.findTxn(txnid);
-			}
-			
+			} 
 		}
 		return new TxnRequest(txnid, new AddRequest());
 	}

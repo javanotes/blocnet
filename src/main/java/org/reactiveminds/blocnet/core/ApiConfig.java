@@ -1,7 +1,8 @@
-package org.reactiveminds.blocnet;
+package org.reactiveminds.blocnet.core;
 
 import java.io.IOException;
 
+import org.reactiveminds.blocnet.Bootstrap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

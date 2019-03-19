@@ -2,25 +2,34 @@ package org.reactiveminds.blocnet.core;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Properties;
 
 import org.reactiveminds.blocnet.Bootstrap;
 import org.reactiveminds.blocnet.api.BlocMiner;
+import org.reactiveminds.blocnet.api.BlocService;
+import org.reactiveminds.blocnet.model.BlockRef;
+import org.reactiveminds.blocnet.model.dao.BlockRefMapStore;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.Resource;
 import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.config.JoinConfig;
+import com.hazelcast.config.MapStoreConfig;
 import com.hazelcast.config.NetworkConfig;
 import com.hazelcast.config.XmlConfigBuilder;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.MapLoader;
+import com.hazelcast.core.MapStoreFactory;
 
 @Configuration
 @ConditionalOnProperty(name = "blocnet.miner", havingValue="true")
@@ -80,8 +89,26 @@ class MinerConfig {
 				join.getMulticastConfig().setMulticastPort(multicastPort);
 			}
 		}
+		
+		MapStoreConfig storeConf = conf.getMapConfig(BlocService.refTablePattern()).getMapStoreConfig();
+		storeConf.setFactoryImplementation(new MapStoreFactory<String, BlockRef>() {
+
+			@Override
+			public MapLoader<String, BlockRef> newMapStore(String mapName, Properties properties) {
+				BlockRefMapStore store = mapStore();
+				store.setMapName(mapName);
+				return store;
+			}
+		});
+		storeConf.setWriteDelaySeconds(1);
+		storeConf.setEnabled(true);
+		
 		return Hazelcast.newHazelcastInstance(conf);
 	}
-	
+	@Bean
+	@Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+	BlockRefMapStore mapStore() {
+		return new BlockRefMapStore();
+	}
 	
 }

@@ -14,8 +14,21 @@ import org.reactiveminds.blocnet.utils.MiningTimeoutException;
 
 public interface BlocService {
 
+	String REF_TABLE_PATTERN = "__ref_";
+	public static String refTablePattern() {
+		return REF_TABLE_PATTERN+"*";
+	}
 	public static String getRefTableName(String chain) {
-		return chain + "__ref";
+		return REF_TABLE_PATTERN+chain;
+	}
+	public static String chainFromRefTableName(String name) {
+		if(name.startsWith(REF_TABLE_PATTERN)) {
+			return name.substring(REF_TABLE_PATTERN.length());
+		}
+		/*if(name.endsWith(REF_TABLE_PATTERN)) {
+			return name.substring(0, name.indexOf(REF_TABLE_PATTERN));
+		}*/
+		return name;
 	}
 	/**
 	 * 

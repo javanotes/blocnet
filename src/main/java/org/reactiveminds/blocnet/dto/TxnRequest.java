@@ -1,14 +1,19 @@
 package org.reactiveminds.blocnet.dto;
 
 import java.io.IOException;
+import java.io.Serializable;
 
 import com.hazelcast.core.PartitionAware;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.DataSerializable;
 
-public class TxnRequest implements DataSerializable, PartitionAware<String>{
+public class TxnRequest implements Serializable, DataSerializable, PartitionAware<String>{
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	@Override
 	public String toString() {
 		return "[txnId=" + txnId + ", request=" + request + ", chain=" + chain + "]";

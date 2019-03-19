@@ -47,7 +47,7 @@ public class RestApi {
 		TxnRequest txn = service.fetchTransaction(name, txnid);
 		GetTxnResponse rep = new GetTxnResponse();
 		resp.setStatus(HttpStatus.NOT_FOUND.value());
-		
+		rep.setTxnId(txn.getTxnId());
 		if(StringUtils.hasText(txn.getRequest())) {
 			resp.setStatus(HttpStatus.OK.value());
 			rep.setBody(txn.getRequest());

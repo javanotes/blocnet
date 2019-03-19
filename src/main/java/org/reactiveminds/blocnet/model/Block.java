@@ -29,11 +29,7 @@ public class Block implements DataSerializable{
 	private long id;
 	public Block() {
 	}
-	/*public Block(Entities pool, String prevHash) {
-		this.timestamp = System.currentTimeMillis();
-		this.payload = SerdeUtil.toBytes(pool);
-		this.prevHash = prevHash;
-	}*/
+	
 	private String chain;
 	private long timestamp;
 	private long nonce;

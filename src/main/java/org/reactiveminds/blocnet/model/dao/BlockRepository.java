@@ -23,6 +23,18 @@ public interface BlockRepository extends CrudRepository<Block, Long> {
 	List<Block> findByChainHierarchy(String chain);
 	
 	List<Block> findByChain(String chain);
+	
+	/**
+	 * @deprecated mysql 5.6 does not support CTE (connect with prior)
+	 * @param chain
+	 * @param lastHash
+	 * @return
+	 */
+	@Query(value = "SELECT a.* " + 
+			"FROM blockchains a " + 
+			"INNER JOIN " + 
+			"blockchains b ON a.prev_hash=b.curr_hash and a.chain=b.chain where b.chain=? and b.curr_hash=? ORDER BY a.id DESC", nativeQuery = true)
+	List<Block> findByChainHierarchyNext(String chain, String lastHash);
 	/**
 	 * 
 	 * @param chain

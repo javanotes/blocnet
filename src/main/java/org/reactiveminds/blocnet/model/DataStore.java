@@ -29,10 +29,16 @@ public interface DataStore {
 	 */
 	Deque<Block> loadChain(String name);
 	/**
-	 * Fetch a block for a given chain and optional hash key
+	 * Fetch block/s for a given chain and hash key/s
 	 * @param name
 	 * @param hash
 	 * @return
 	 */
-	List<Block> loadBlock(String name, String...hash);
+	List<Block> findBlock(String name, String...hash);
+	/**
+	 * Fetch all blocks falling after the given block link wise
+	 * @param block
+	 * @return
+	 */
+	Deque<Block> loadChain(Block after);
 }

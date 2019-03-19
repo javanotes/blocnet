@@ -14,7 +14,7 @@ import org.reactiveminds.blocnet.ds.HashUtil;
 import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.model.BlockRef;
 import org.reactiveminds.blocnet.model.DataStore;
-import org.reactiveminds.blocnet.utils.InvalidBlockException;
+import org.reactiveminds.blocnet.utils.InvalidChainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,32 +43,61 @@ class JpaDataStore implements DataStore {
 	
 	@Override
 	public Deque<Block> loadChain(String name) {
+		return loadFromBeginning(name);
+	}
+	private LinkedList<Block> loadFromBeginning(String name) {
+		return loadSlice(name, HashUtil.GENESIS_PREV_HASH, null);
+	}
+	private LinkedList<Block> loadFromOffset(String name, String hash) {
+		return loadSlice(name, hash, null);
+	}
+	/**
+	 * Slice chain with the given hash offsets
+	 * @param name chain name
+	 * @param fromHash load chain from the next link after this (exclusive)
+	 * @param tillHash load chain till this link (inclusive)
+	 * @return
+	 */
+	private LinkedList<Block> loadSlice(String name, String fromHash, String tillHash) {
 		List<Block> blocks = repo.findByChain(name);
 		if(blocks == null || blocks.isEmpty())
-			return new LinkedList<>();
+			return new LinkedList<Block>();
 		
 		Map<String, Block> mapped = blocks.stream().collect(Collectors.toMap(Block::getPrevHash, Function.identity()));
-		Block genesis = mapped.get(HashUtil.GENESIS_PREV_HASH);
-		if(genesis == null)
-			throw new InvalidBlockException("No genesis block found in loaded chain!");
 		
-		LinkedList<Block> linked = new LinkedList<>();
-		linked.add(genesis);
+		Block bloc = mapped.get(HashUtil.GENESIS_PREV_HASH);
+		if(bloc == null)
+			throw new InvalidChainException("No genesis block found in loaded chain");
 		
-		while(mapped.containsKey(genesis.getCurrHash())) {
-			genesis = mapped.get(genesis.getCurrHash());
-			linked.add(genesis);
+		final LinkedList<Block> linked = new LinkedList<>();
+		boolean offsetReached = false;
+		
+		if (fromHash != null && fromHash.equals(HashUtil.GENESIS_PREV_HASH)) {
+			linked.add(bloc);
+			offsetReached = true;
 		}
-		log.info("Linked blocks: "+linked);
+		
+		while(mapped.containsKey(bloc.getCurrHash())) {
+			//get the next node by its previous hash
+			bloc = mapped.get(bloc.getCurrHash());
+			if(fromHash != null && !offsetReached) {
+				offsetReached = fromHash.equals(bloc.getCurrHash());
+				continue;
+			}
+			linked.add(bloc);
+			if(tillHash != null && tillHash.equals(bloc.getCurrHash()))
+				break;
+		}
+		log.debug("Linked blocks: "+linked);
 		return linked;
 	}
 	@Override
 	public void save(Block bloc) {
-		log.info("Saving bloc: "+bloc);
 		repo.save(bloc);
+		log.info("Saved bloc: "+bloc);
 	}
 	@Override
-	public List<Block> loadBlock(String name, String... hash) {
+	public List<Block> findBlock(String name, String... hash) {
 		List<Block> blocks = repo.findByChainAndCurrHashIn(name, hash);
 		if(blocks == null || blocks.isEmpty())
 			return Collections.emptyList();
@@ -85,5 +114,10 @@ class JpaDataStore implements DataStore {
 		//TODO implement backing store for BlockRef
 		IMap<String, BlockRef> cache = hazelcast.getMap(BlocService.getRefTableName(ref.getChain()));
 		cache.set(ref.getTxnid(), ref);
+	}
+
+	@Override
+	public Deque<Block> loadChain(Block block) {
+		return loadFromOffset(block.getChain(), block.getCurrHash());
 	}
 }

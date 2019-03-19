@@ -1,3 +1,9 @@
+
+.gradle/
+bin/
+build/
+
+
 # Compiled class file
 *.class
 
@@ -24,5 +30,5 @@ hs_err_pid*
 
 .gradle/
 bin/
-
+build/
 

@@ -88,7 +88,7 @@ class BlocMinerRunner implements BlocMiner{
 	@PostConstruct
 	private void onStart() {
 		setupCommitListener();
-		log.info("Mine worker ready to slog ..");
+		log.info("-- Mine worker ready to slog --");
 	}
 	
 	private int maxBlockElements;
@@ -99,7 +99,12 @@ class BlocMinerRunner implements BlocMiner{
 		
 	}
 	
-	private class MiningTask implements Runnable{
+	private class MiningTask implements Runnable, Serializable{
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
 
 		protected MiningTask(String t, List<TxnRequest> u) {
 			super();
@@ -172,18 +177,27 @@ class BlocMinerRunner implements BlocMiner{
 		private void removeMempool(BlockData chainPool) {
 			//remove the committed transactions from the global mempool
 			Set<TxnRequest> keys = new HashSet<>(chainPool.getRequests());
-			globalMemPool().removeAll(new Predicate<String, TxnRequest>() {
+			globalMemPool().removeAll(new RemoveTxnPredicate(keys));
+		}
+		
+	}
+	
+	static class RemoveTxnPredicate implements Predicate<String, TxnRequest>{
 
-				/**
-				 * 
-				 */
-				private static final long serialVersionUID = 1L;
+		protected RemoveTxnPredicate(Set<TxnRequest> keys) {
+			super();
+			this.keys = keys;
+		}
 
-				@Override
-				public boolean apply(Entry<String, TxnRequest> mapEntry) {
-					return keys.contains(mapEntry.getValue());
-				}
-			});
+		private final Set<TxnRequest> keys;
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		public boolean apply(Entry<String, TxnRequest> mapEntry) {
+			return keys.contains(mapEntry.getValue());
 		}
 		
 	}
