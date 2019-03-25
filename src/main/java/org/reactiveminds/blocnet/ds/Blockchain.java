@@ -1,5 +1,6 @@
 package org.reactiveminds.blocnet.ds;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Deque;
 import java.util.concurrent.TimeoutException;
 
@@ -27,6 +28,24 @@ public interface Blockchain extends Iterable<Block>{
 				return -1;
 			}
 		};
+	}
+	public static Node transform(Block bloc) {
+		Node block = new Node();
+		block.setData(new String(bloc.getPayload(), StandardCharsets.UTF_8));
+		block.setHash(bloc.getCurrHash());
+		block.setNonce(bloc.getNonce());
+		block.setTimstamp(bloc.getTimestamp());
+		return block;
+	}
+	public static Block transform(Node bloc, String chainName) {
+		Block block = new Block();
+		block.setCurrHash(bloc.getHash());
+		block.setNonce(bloc.getNonce());
+		block.setPayload(bloc.getData().getBytes(StandardCharsets.UTF_8));
+		block.setPrevHash(bloc.getPreviousHash());
+		block.setTimestamp(bloc.getTimstamp());
+		block.setChain(chainName);
+		return block;
 	}
 	/**
 	 * Name of this chain

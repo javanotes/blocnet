@@ -1,6 +1,6 @@
 package org.reactiveminds.blocnet.utils;
 
-public class InvalidChainException extends IllegalArgumentException {
+public class InvalidChainException extends LinkageException {
 
 	/**
 	 * 

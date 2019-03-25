@@ -1,6 +1,5 @@
 package org.reactiveminds.blocnet.ds;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -55,11 +54,11 @@ class BlockchainImpl implements Blockchain {
 		Block b = blocks.poll();
 		//the first should be a genesis block
 		Assert.isTrue(HashUtil.GENESIS_PREV_HASH.equals(b.getPrevHash()), "First block is not a genesis block");
-		genesis = transform(b);
+		genesis = Blockchain.transform(b);
 		tail = genesis;
 		Node curr;
 		while((b = blocks.poll()) != null) {
-			curr = transform(b);
+			curr = Blockchain.transform(b);
 			curr.setPrevious(tail);
 			tail.setNext(curr);
 			tail = curr;
@@ -165,26 +164,6 @@ class BlockchainImpl implements Blockchain {
 		return true;
 	}
 	
-	/*@Deprecated
-	private void mess_it() {
-		tail.setData("changed");
-	}
-	public static void main(String[] args) throws TimeoutException {
-		BlockchainImpl b = new BlockchainImpl("TRANS_BLOC", 4);
-		Node bloc = b.mine("Tom");
-		b.append(bloc);
-		bloc = b.mine("owes 36");
-		b.append(bloc);
-		bloc = b.mine("from Dick");
-		b.append(bloc);
-		
-		System.out.println(b);
-		System.out.println("is valid chain ? "+b.verify());
-		b.mess_it();
-		System.out.println("is valid chain ? "+b.verify());
-	}*/
-	
-	
 	/* (non-Javadoc)
 	 * @see org.reactiveminds.hazelblock.ds.IBlockchain#getMaxSize()
 	 */
@@ -220,35 +199,17 @@ class BlockchainImpl implements Blockchain {
 			
 			Node bloc = root;
 			root = bloc.getNext();
-			return transform(bloc);
+			return Blockchain.transform(bloc, getChainName());
 		}
 		
 	}
 
-	private Block transform(Node bloc) {
-		Block block = new Block();
-		block.setCurrHash(bloc.getHash());
-		block.setNonce(bloc.getNonce());
-		block.setPayload(bloc.getData().getBytes(StandardCharsets.UTF_8));
-		block.setPrevHash(bloc.getPreviousHash());
-		block.setTimestamp(bloc.getTimstamp());
-		block.setChain(getChainName());
-		return block;
-	}
-	private static Node transform(Block bloc) {
-		Node block = new Node();
-		block.setData(new String(bloc.getPayload(), StandardCharsets.UTF_8));
-		block.setHash(bloc.getCurrHash());
-		block.setNonce(bloc.getNonce());
-		block.setTimstamp(bloc.getTimestamp());
-		return block;
-	}
 	@Override
 	public boolean isFull() {
 		return getSize() == getMaxSize();
 	}
 	@Override
 	public Block getLast() {
-		return transform(tail);
+		return Blockchain.transform(tail, getChainName());
 	}
 }

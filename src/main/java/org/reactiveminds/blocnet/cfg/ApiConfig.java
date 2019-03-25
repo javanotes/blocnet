@@ -1,4 +1,4 @@
-package org.reactiveminds.blocnet.core;
+package org.reactiveminds.blocnet.cfg;
 
 import java.io.IOException;
 

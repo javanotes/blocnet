@@ -1,16 +1,15 @@
 package org.reactiveminds.blocnet.core;
 
 import java.util.Collections;
-import java.util.Deque;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import org.reactiveminds.blocnet.api.BlocService;
+import org.reactiveminds.blocnet.api.ChainCache;
 import org.reactiveminds.blocnet.ds.Blockchain;
+import org.reactiveminds.blocnet.ds.HashUtil;
 import org.reactiveminds.blocnet.ds.Node;
 import org.reactiveminds.blocnet.dto.AddRequest;
 import org.reactiveminds.blocnet.dto.GetBlockResponse;
@@ -28,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.hazelcast.core.HazelcastInstance;
@@ -38,63 +36,27 @@ import com.hazelcast.core.IMap;
 class ServiceImpl implements BlocService {
 
 	private static final Logger log = LoggerFactory.getLogger("BlocService");
-	private final ConcurrentMap<String, Blockchain> chainCache = new ConcurrentHashMap<>();
-	/**
-	 * Loads from data store and verifies the chain as well.
-	 * @param name
-	 * @param autocreate
-	 * @return
-	 * @throws InvalidChainException
-	 */
-	private Blockchain load(String name, boolean autocreate) throws InvalidChainException {
-		Deque<Block> loaded;
-		try {
-			loaded = db.loadChain(name);
-		} catch (IllegalStateException e) {
-			throw new InvalidChainException("Duplicate prev_hash detected", e);
-		}
-		Blockchain b;
-		
-		if((loaded == null || loaded.isEmpty())) {
-			if(autocreate) {
-				b = Blockchain.newInstance(name, challengeLevel);
-				db.save(b);
-			}
-			else
-				b = Blockchain.emptyChain();
-		}
-		else
-			b = Blockchain.buildInstance(name, challengeLevel, loaded);
-		
-		b.verify();
-		return b;
-		
-	}
 	
-	private Blockchain getOrLoad(String name) {
-		if (!chainCache.containsKey(name)) {
-			chainCache.putIfAbsent(name, load(name, true));
-		}
-		return chainCache.get(name);
-	}
+	@Autowired
+	ChainCache chainCache;
 	
 	@Autowired
 	DataStore db;
 	@Autowired
 	HazelcastInstance hazelcast;
 	
-	@Value("${chains.mine.challengeLevel:4}")
-	private int challengeLevel;
-	
 	@Override
 	public GetBlockResponse getChain(String name) {
-		Blockchain chain = getOrLoad(name);
+		Blockchain chain = chainCache.getOrLoad(name);
 		if(chain.getSize() == -1)
 		{
 			GetBlockResponse resp = new GetBlockResponse(Collections.emptyList());
 			resp.setStatus(Response.NOT_FOUND);
 			return resp;
 		}
+		if(!chain.verify())
+			throw new InvalidChainException(name);
+		
 		List<Block> blocks = StreamSupport.stream(chain.spliterator(), false).collect(Collectors.toList());
 		return new GetBlockResponse(blocks);
 	}
@@ -107,7 +69,7 @@ class ServiceImpl implements BlocService {
 		HazelcastInstance hazel = beans.getBean(HazelcastInstance.class);
 		String txnId = Long.toHexString(hazelcast.getFlakeIdGenerator(request.getChainId()).newId());
 		TxnRequest txn = new TxnRequest(txnId, request);
-		hazel.getMap(BlocMinerRunner.MEMPOOL).set(txn.getPartitionKey(), txn);
+		hazel.getMap(ScheduledBlocMiner.MEMPOOL).set(txn.getPartitionKey(), txn);
 		
 		return txnId;
 		
@@ -115,7 +77,7 @@ class ServiceImpl implements BlocService {
 
 	@Override
 	public Node mineBlock(String chainId, String blockData) {
-		Blockchain chain = getOrLoad(chainId);
+		Blockchain chain = chainCache.getOrLoad(chainId);
 		//chain will never be null
 		Node n;
 		try {
@@ -128,7 +90,7 @@ class ServiceImpl implements BlocService {
 	}
 	@Override
 	public Block appendBlock(String chain, Node n) throws InvalidBlockException, InvalidChainException {
-		Blockchain b = getOrLoad(chain);
+		Blockchain b = chainCache.getOrLoad(chain);
 		b.append(n);
 		b.verify();
 		if (log.isDebugEnabled()) {
@@ -141,7 +103,7 @@ class ServiceImpl implements BlocService {
 
 	@Override
 	public void refreshCache(String chain) {
-		chainCache.replace(chain, load(chain, false));
+		chainCache.refresh(chain);
 	}
 
 	@Override
@@ -154,13 +116,35 @@ class ServiceImpl implements BlocService {
 		IMap<String, BlockRef> cache = hazelcast.getMap(BlocService.getRefTableName(chain));
 		BlockRef ref = cache.get(txnid);
 		if (ref != null) {
+			boolean valid = ref.isValid();
+			if (!valid)
+				throw new InvalidBlockException(txnid);
+			
 			List<Block> blocs = db.findBlock(chain, ref.getHash());
-			if (!blocs.isEmpty()) {
-				Block b = blocs.stream().findFirst().get();
-				BlockData data = SerdeUtil.fromBytes(b.getPayload(), BlockData.class);
-				return data.findTxn(txnid);
+			try 
+			{
+				if (!blocs.isEmpty()) {
+					Block b = blocs.stream().findFirst().get();
+					Node n = Blockchain.transform(b);
+
+					valid = HashUtil.isValid(n, b.getPrevHash());
+					if (!valid)
+						throw new InvalidBlockException(txnid);
+					valid = chainCache.verify(chain, false);
+					if (!valid)
+						throw new InvalidChainException(chain);
+
+					BlockData data = SerdeUtil.fromBytes(b.getPayload(), BlockData.class);
+					return data.findTxn(txnid);
+				} 
+			} finally {
+				if(!valid) {
+					ref.setValid(false);
+					saveBlockRef(ref);
+				}
 			} 
 		}
+		
 		return new TxnRequest(txnid, new AddRequest());
 	}
 

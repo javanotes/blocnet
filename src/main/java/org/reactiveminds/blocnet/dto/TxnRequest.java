@@ -67,6 +67,7 @@ public class TxnRequest implements Serializable, DataSerializable, PartitionAwar
 	private String txnId;
 	private String request;
 	private String chain;
+	
 	public TxnRequest(String txnId, AddRequest request) {
 		super();
 		this.txnId = txnId;
@@ -92,5 +93,4 @@ public class TxnRequest implements Serializable, DataSerializable, PartitionAwar
 	public String getPartitionKey() {
 		return getChain()+KEY_SEP+getTxnId();
 	}
-	
 }

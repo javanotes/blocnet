@@ -1,6 +1,6 @@
 package org.reactiveminds.blocnet.utils;
 
-public class InvalidBlockException extends IllegalArgumentException {
+public class InvalidBlockException extends LinkageException {
 
 	/**
 	 * 

@@ -3,6 +3,7 @@ package org.reactiveminds.blocnet.model;
 import java.io.IOException;
 
 import javax.persistence.Column;
+import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -49,11 +50,16 @@ public class BlockRef implements DataSerializable{
 	private String txnid;
 	private String hash;
 	
+	@Column(name="valid", length=1)
+	@Convert(converter = Boolean2CharConverter.class)
+	private Boolean valid = true;
+	
 	@Override
 	public void writeData(ObjectDataOutput out) throws IOException {
 		out.writeUTF(hash);
 		out.writeUTF(chain);
 		out.writeUTF(txnid);
+		out.writeBoolean(valid);
 	}
 
 	@Override
@@ -61,5 +67,12 @@ public class BlockRef implements DataSerializable{
 		setHash(in.readUTF());
 		setChain(in.readUTF());
 		setTxnid(in.readUTF());
+		setValid(in.readBoolean());
+	}
+	public Boolean isValid() {
+		return valid;
+	}
+	public void setValid(Boolean valid) {
+		this.valid = valid;
 	}
 }

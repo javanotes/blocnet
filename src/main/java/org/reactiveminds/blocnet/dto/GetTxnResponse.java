@@ -28,4 +28,12 @@ public class GetTxnResponse {
 	String chainId;
 	String txnId;
 	String body;
+	Response status = Response.OK;
+	public Response getStatus() {
+		return status;
+	}
+
+	public void setStatus(Response status) {
+		this.status = status;
+	}
 }

@@ -1,4 +1,4 @@
-package org.reactiveminds.blocnet.core;
+package org.reactiveminds.blocnet.cfg;
 
 import java.io.IOException;
 import java.net.URL;
@@ -7,6 +7,8 @@ import java.util.Properties;
 import org.reactiveminds.blocnet.Bootstrap;
 import org.reactiveminds.blocnet.api.BlocMiner;
 import org.reactiveminds.blocnet.api.BlocService;
+import org.reactiveminds.blocnet.core.ScheduledBlocMiner;
+import org.reactiveminds.blocnet.core.TriggeredBlocMiner;
 import org.reactiveminds.blocnet.model.BlockRef;
 import org.reactiveminds.blocnet.model.dao.BlockRefMapStore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,9 +37,11 @@ import com.hazelcast.core.MapStoreFactory;
 @ConditionalOnProperty(name = "blocnet.miner", havingValue="true")
 class MinerConfig {
 
+	@Value("${chains.mine.executionMode:t}")
+	private String mode;
 	@Bean
 	BlocMiner miner() {
-		return new BlocMinerRunner();
+		return mode.equalsIgnoreCase("s") ? new ScheduledBlocMiner() : new TriggeredBlocMiner();
 	}
 	
 	@Value("${chains.hazelcast.config:}")

@@ -1,4 +1,4 @@
-package org.reactiveminds.blocnet.core;
+package org.reactiveminds.blocnet.cfg;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
