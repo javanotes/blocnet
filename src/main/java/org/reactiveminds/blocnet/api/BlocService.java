@@ -32,11 +32,6 @@ public interface BlocService {
 		return name;
 	}
 	/**
-	 * Adds a block commit listener.
-	 * @param listener
-	 */
-	void addBlocCommitListener(BlocCommitListener listener);
-	/**
 	 * 
 	 * @param name
 	 * @return
