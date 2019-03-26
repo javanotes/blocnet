@@ -11,7 +11,7 @@ import org.reactiveminds.blocnet.dto.GetBlockResponse;
 import org.reactiveminds.blocnet.dto.GetTxnResponse;
 import org.reactiveminds.blocnet.dto.Response;
 import org.reactiveminds.blocnet.dto.TxnRequest;
-import org.reactiveminds.blocnet.utils.LinkageException;
+import org.reactiveminds.blocnet.utils.err.IllegalLinkException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +41,7 @@ public class RestApi {
 	public GetBlockResponse getChain(@PathVariable String name, HttpServletResponse resp) {
 		try {
 			return service.getChain(name);
-		} catch (LinkageException e) {
+		} catch (IllegalLinkException e) {
 			log.error(e.toString());
 			resp.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
 			GetBlockResponse get = new GetBlockResponse(Collections.emptyList());
@@ -72,7 +72,7 @@ public class RestApi {
 				rep.setStatus(Response.OK);
 			}
 			
-		} catch (LinkageException e) {
+		} catch (IllegalLinkException e) {
 			log.error(e.toString());
 			resp.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
 			rep.setStatus(Response.INVALID_BLOCKCHAIN);

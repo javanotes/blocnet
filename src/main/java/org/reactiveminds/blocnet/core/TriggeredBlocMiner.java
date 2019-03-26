@@ -4,13 +4,17 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
 
 import org.reactiveminds.blocnet.api.BlocMiner;
 import org.reactiveminds.blocnet.dto.TxnRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import com.hazelcast.core.EntryEvent;
@@ -27,9 +31,10 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 	@Value("${chains.mine.maxBlockElements:1000}")
 	private int maxBlockElements;
 	@Scheduled(fixedDelayString = "${chains.mine.schedulePeriod:PT30S}")
-	public void simpleTimer() {
-		miningTask();
+	public void miningTaskScheduler() {
+		run();
 	}
+	private Lock taskLock = new ReentrantLock();
 	/**
 	 * 
 	 */
@@ -38,11 +43,17 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 	@PostConstruct
 	private void init() {
 		requests = new ArrayBlockingQueue<>(maxBlockElements);
-		globalMemPool().addLocalEntryListener(this, new MatchAllTxnPredicate(), false);
+		globalMemPool().addLocalEntryListener(this, new TxnPredicate.MatchAllTxnPredicate(), false);
 	}
 	@Override
-	public synchronized void miningTask() {
-		doMiningTask();
+	public void run() {
+		if (taskLock.tryLock()) {
+			try {
+				doMiningTask();
+			} finally {
+				taskLock.unlock();
+			}
+		}
 	}
 
 	@Override
@@ -51,13 +62,13 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 	}
 
 	@Override
-	protected List<TxnRequest> snapshotMempool() {
+	protected List<TxnRequest> fetchMempool() {
 		return globalMemPool().localKeySet().stream().filter(s -> requests.remove(s)).map(s -> mempoolEntry(s))
 				.collect(Collectors.toList());
 	}
 
 	@Override
-	protected boolean isCommitThresholdReached() {
+	protected boolean isCommitReady() {
 		return !requests.isEmpty();
 	}
 
@@ -66,11 +77,13 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 	public void entryUpdated(EntryEvent<String, TxnRequest> event) {
 		entryAdded(event);
 	}
-
+	@Autowired
+	AsyncTaskExecutor taskExecutor;
+	
 	@Override
 	public void entryAdded(EntryEvent<String, TxnRequest> event) {
 		if(!requests.offer(event.getKey())){
-			miningTask();
+			run();
 			entryAdded(event);
 		}
 	}

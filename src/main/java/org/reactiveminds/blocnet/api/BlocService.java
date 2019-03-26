@@ -8,9 +8,9 @@ import org.reactiveminds.blocnet.dto.GetBlockResponse;
 import org.reactiveminds.blocnet.dto.TxnRequest;
 import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.model.BlockRef;
-import org.reactiveminds.blocnet.utils.InvalidBlockException;
-import org.reactiveminds.blocnet.utils.InvalidChainException;
-import org.reactiveminds.blocnet.utils.MiningTimeoutException;
+import org.reactiveminds.blocnet.utils.err.InvalidBlockException;
+import org.reactiveminds.blocnet.utils.err.InvalidChainException;
+import org.reactiveminds.blocnet.utils.err.MiningTimeoutException;
 
 public interface BlocService {
 
@@ -30,6 +30,11 @@ public interface BlocService {
 		}*/
 		return name;
 	}
+	/**
+	 * Adds a block commit listener.
+	 * @param listener
+	 */
+	void addBlocCommitListener(BlocCommitListener listener);
 	/**
 	 * 
 	 * @param name

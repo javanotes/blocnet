@@ -3,7 +3,6 @@ package org.reactiveminds.blocnet.core;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -19,9 +18,9 @@ import org.reactiveminds.blocnet.dto.TxnRequest;
 import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.model.BlockData;
 import org.reactiveminds.blocnet.model.BlockRef;
-import org.reactiveminds.blocnet.utils.InvalidBlockException;
-import org.reactiveminds.blocnet.utils.MiningTimeoutException;
 import org.reactiveminds.blocnet.utils.SerdeUtil;
+import org.reactiveminds.blocnet.utils.err.InvalidBlockException;
+import org.reactiveminds.blocnet.utils.err.MiningTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,28 +30,14 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.Message;
-import com.hazelcast.core.MessageListener;
-import com.hazelcast.query.Predicate;
-
+/**
+ * Base implementation that does the common task for mining and committing.
+ * @author Sutanu_Dalui
+ *
+ */
 abstract class AbstractBlocMiner implements BlocMiner {
 
 	final Logger log = LoggerFactory.getLogger(getClass().getSimpleName());
-	private class CommitListener implements MessageListener<BlockData>, Serializable{
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		@Override
-		public void onMessage(Message<BlockData> message) {
-			updateLocalMempool(message.getMessageObject());
-		}
-		private void updateLocalMempool(BlockData mpool) {
-			service.refreshCache(mpool.getChain());
-			log.info("New block notification processed for chain - "+mpool.getChain());
-		}
-	}
 	
 	@Value("${chain.mine.awaitChainLockSecs:10}")
 	private long awaitChainLock;
@@ -63,79 +48,44 @@ abstract class AbstractBlocMiner implements BlocMiner {
 	@Autowired
 	AsyncTaskExecutor taskExecutor;
 	
-	private static class RemoveTxnPredicate implements Predicate<String, TxnRequest>{
-
-		protected RemoveTxnPredicate(Set<TxnRequest> keys) {
-			super();
-			this.keys = keys;
-		}
-
-		private final Set<TxnRequest> keys;
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		@Override
-		public boolean apply(Entry<String, TxnRequest> mapEntry) {
-			return keys.contains(mapEntry.getValue());
-		}
-		
-	}
-	static class MatchAllTxnPredicate implements Predicate<String, TxnRequest>{
-
-		protected MatchAllTxnPredicate() {
-			super();
-		}
-
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = 1L;
-
-		@Override
-		public boolean apply(Entry<String, TxnRequest> mapEntry) {
-			return true;
-		}
-		
-	}
-	
 	private void removeMempool(BlockData chainPool) {
 		//remove the committed transactions from the global mempool
 		Set<TxnRequest> keys = new HashSet<>(chainPool.getRequests());
-		globalMemPool().removeAll(new RemoveTxnPredicate(keys));
+		globalMemPool().removeAll(new TxnPredicate.RemoveTxnPredicate(keys));
 	}
 	IMap<String, TxnRequest> globalMemPool() {
 		return hazelcast.<String, TxnRequest>getMap(MEMPOOL);
 	}
 	@PostConstruct
 	private void setupCommitListener() {
-		hazelcast.<BlockData>getTopic(COMMITNOTIF).addMessageListener(new CommitListener());
 		log.info("Mine worker setup done. Ready to run ..");
 	}
 	TxnRequest mempoolEntry(String key) {
 		return Optional.ofNullable(globalMemPool().get(key)).orElse(new TxnRequest(key, new AddRequest()));
 	}
 	/**
-	 * 
+	 * Get a mempool snapshot for this mining task. Subclasses will
+	 * implement the data fetch.
 	 * @return
 	 */
-	protected abstract List<TxnRequest> snapshotMempool();
+	protected abstract List<TxnRequest> fetchMempool();
 	/**
-	 * 
+	 * Check if the mining threshold has been reached, so a commit operation can be tried now. Subclasses will
+	 * implement this logic.
 	 * @return
 	 */
-	protected abstract boolean isCommitThresholdReached();
-	
+	protected abstract boolean isCommitReady();
+	/**
+	 * The core mining task that is being performed.
+	 */
 	protected void doMiningTask() {
-		if(!isCommitThresholdReached())
+		if(!isCommitReady())
 			return;
 		
 		log.info("Mining task execution launched ..");
 		//get the current mempool
-		BlockData blocData; 
-		//take the local entries as your snapshot
-		blocData = new BlockData(snapshotMempool());
+		//take the local entries as the snapshot
+		BlockData blocData = new BlockData(fetchMempool());
 		
 		//mine for each chain available
 		blocData.groupByChain().forEach(new BiConsumer<String, List<TxnRequest>>() {

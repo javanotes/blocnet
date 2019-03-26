@@ -1,8 +1,7 @@
-package org.reactiveminds.blocnet.cfg;
+package org.reactiveminds.blocnet;
 
 import java.io.IOException;
 
-import org.reactiveminds.blocnet.Bootstrap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -16,10 +15,15 @@ import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.XmlClientConfigBuilder;
 import com.hazelcast.core.HazelcastInstance;
-
+/**
+ * Enabling this configuration will make this instance as an edge node - exposing REST endpoints to
+ * interact with the core mining cluster.
+ * @author Sutanu_Dalui
+ *
+ */
 @ConditionalOnProperty(name = "blocnet.miner", havingValue="false", matchIfMissing=true)
 @Configuration
-class ApiConfig {
+class EdgeConfig {
 	
 	@Value("${chains.hazelcast.config:}")
 	String configXml;

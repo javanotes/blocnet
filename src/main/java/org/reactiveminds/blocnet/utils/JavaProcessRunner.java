@@ -6,8 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import org.reactiveminds.blocnet.ds.HashUtil;
 /**
  * A simple java class runner that executes the class as a separate jvm process. Assuming there is no external class/library dependency, other than
 	that already set for the invoker process. The classpath and java home will be resolved as system property from the running jvm.
@@ -73,7 +71,7 @@ public class JavaProcessRunner implements Runnable {
 	}
 
 	public static void main(String[] args) {
-		JavaProcessRunner runner = new JavaProcessRunner(HashUtil.class);
+		JavaProcessRunner runner = new JavaProcessRunner(Crypto.class);
 		runner.initialize("$genesis", "0000000000000000000000000000000000000000000000000000000000000000", -1);
 		runner.run();
 		System.out.println("result: "+runner.getOutputString());

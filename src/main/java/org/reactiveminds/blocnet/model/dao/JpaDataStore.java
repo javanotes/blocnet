@@ -10,11 +10,11 @@ import java.util.stream.Collectors;
 
 import org.reactiveminds.blocnet.api.BlocService;
 import org.reactiveminds.blocnet.ds.Blockchain;
-import org.reactiveminds.blocnet.ds.HashUtil;
 import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.model.BlockRef;
 import org.reactiveminds.blocnet.model.DataStore;
-import org.reactiveminds.blocnet.utils.InvalidChainException;
+import org.reactiveminds.blocnet.utils.Crypto;
+import org.reactiveminds.blocnet.utils.err.InvalidChainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +46,7 @@ class JpaDataStore implements DataStore {
 		return loadFromBeginning(name);
 	}
 	private LinkedList<Block> loadFromBeginning(String name) {
-		return loadSlice(name, HashUtil.GENESIS_PREV_HASH, null);
+		return loadSlice(name, Crypto.GENESIS_PREV_HASH, null);
 	}
 	private LinkedList<Block> loadFromOffset(String name, String hash) {
 		return loadSlice(name, hash, null);
@@ -65,14 +65,14 @@ class JpaDataStore implements DataStore {
 		
 		Map<String, Block> mapped = blocks.stream().collect(Collectors.toMap(Block::getPrevHash, Function.identity()));
 		
-		Block bloc = mapped.get(HashUtil.GENESIS_PREV_HASH);
+		Block bloc = mapped.get(Crypto.GENESIS_PREV_HASH);
 		if(bloc == null)
 			throw new InvalidChainException("No genesis block found in loaded chain");
 		
 		final LinkedList<Block> linked = new LinkedList<>();
 		boolean offsetReached = false;
 		
-		if (fromHash != null && fromHash.equals(HashUtil.GENESIS_PREV_HASH)) {
+		if (fromHash != null && fromHash.equals(Crypto.GENESIS_PREV_HASH)) {
 			linked.add(bloc);
 			offsetReached = true;
 		}

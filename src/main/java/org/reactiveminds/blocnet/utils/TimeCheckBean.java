@@ -1,13 +1,7 @@
-package org.reactiveminds.blocnet.ds;
+package org.reactiveminds.blocnet.utils;
 
 import java.time.Duration;
 
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
-
-@Component
-@Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class TimeCheckBean {
 	public TimeCheckBean(int maxIteration, Duration maxTimeLapse) {
 		super();

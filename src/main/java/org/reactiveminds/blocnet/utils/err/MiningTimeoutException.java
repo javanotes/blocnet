@@ -1,4 +1,4 @@
-package org.reactiveminds.blocnet.utils;
+package org.reactiveminds.blocnet.utils.err;
 
 import java.util.concurrent.TimeoutException;
 

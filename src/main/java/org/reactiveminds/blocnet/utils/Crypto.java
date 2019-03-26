@@ -1,4 +1,4 @@
-package org.reactiveminds.blocnet.ds;
+package org.reactiveminds.blocnet.utils;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -8,11 +8,17 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.reactiveminds.blocnet.ds.Node;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
-
-public class HashUtil {
-	
+/**
+ * Utility class for all cryptographic hash (SHA256) related operations.
+ * @author Sutanu_Dalui
+ *
+ */
+public final class Crypto {
+	private Crypto() {
+	}
 	public static final char[] HEX_CHARS =
 		{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 	/**
@@ -61,21 +67,7 @@ public class HashUtil {
 		digestor.update(toBytes(block.getNonce()));
 		return encodeHex(digestor.digest());
 	}
-	private static String getHash0(String data, String prevHash, long generateNonce) {
-		MessageDigest digestor = digestors.get();
-		digestor.reset();
-		digestor.update(data.getBytes(StandardCharsets.UTF_8));
-		digestor.update(prevHash.getBytes(StandardCharsets.UTF_8));
-		digestor.update(toBytes(generateNonce == -1 ? Math.abs(nonceGen.nextLong()) : generateNonce));
-		return encodeHex(digestor.digest());
-	}
-	public static void main(String[] args) {
-		if(args.length != 3) {
-			System.out.println("invalid input len - "+args.length);
-			return;
-		}
-		System.out.println(getHash0(args[0], args[1], Long.parseLong(args[2])));
-	}
+	
 	/**
 	 * Simple hashing with no challenge. Can be used for use case PoC
 	 * @param block

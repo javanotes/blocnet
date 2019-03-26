@@ -6,10 +6,11 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.reactiveminds.blocnet.Bootstrap;
+import org.reactiveminds.blocnet.core.BaseConfig;
 import org.reactiveminds.blocnet.model.Block;
-import org.reactiveminds.blocnet.utils.InvalidBlockException;
-import org.reactiveminds.blocnet.utils.InvalidChainException;
+import org.reactiveminds.blocnet.utils.Crypto;
+import org.reactiveminds.blocnet.utils.err.InvalidBlockException;
+import org.reactiveminds.blocnet.utils.err.InvalidChainException;
 import org.springframework.util.Assert;
 /**
  * A two way linked list of {@link Node}. This class is thread safe.
@@ -53,7 +54,7 @@ class BlockchainImpl implements Blockchain {
 	private void build(Deque<Block> blocks) {
 		Block b = blocks.poll();
 		//the first should be a genesis block
-		Assert.isTrue(HashUtil.GENESIS_PREV_HASH.equals(b.getPrevHash()), "First block is not a genesis block");
+		Assert.isTrue(Crypto.GENESIS_PREV_HASH.equals(b.getPrevHash()), "First block is not a genesis block");
 		genesis = Blockchain.transform(b);
 		tail = genesis;
 		Node curr;
@@ -72,7 +73,7 @@ class BlockchainImpl implements Blockchain {
 		this(GENESIS, challengeLevel);
 	}
 	private BlockchainImpl(String name, int challengeLevel, Node genesis) {
-		this(name, HashUtil.toRepeatingIntString(0, challengeLevel), genesis);
+		this(name, Crypto.toRepeatingIntString(0, challengeLevel), genesis);
 	}
 	/**
 	 * Constructor to create a new chain
@@ -82,11 +83,11 @@ class BlockchainImpl implements Blockchain {
 	 */
 	private BlockchainImpl(String name, String challenge, Node genesis) {
 		super();
-		Assert.isTrue(HashUtil.GENESIS_PREV_HASH.equals(genesis.getPreviousHash()), "First block is not a genesis block");
+		Assert.isTrue(Crypto.GENESIS_PREV_HASH.equals(genesis.getPreviousHash()), "First block is not a genesis block");
 		chainName = name;
 		this.genesis = genesis;
 		this.challenge = challenge;
-		HashUtil.generateHash(genesis, challenge, Bootstrap.newTimeCheckBean());
+		Crypto.generateHash(genesis, challenge, BaseConfig.newTimeCheckBean());
 		tail = genesis;
 	}
 	
@@ -116,9 +117,9 @@ class BlockchainImpl implements Blockchain {
 	public Node mine(String data) throws TimeoutException {
 		Node b = new Node(data);
 		b.setPrevious(tail);
-		boolean done = HashUtil.generateHash(b, challenge, Bootstrap.newTimeCheckBean());
+		boolean done = Crypto.generateHash(b, challenge, BaseConfig.newTimeCheckBean());
 		if(!done)
-			throw new TimeoutException("Mining unsuccessful. Max iteration exceeded - "+Bootstrap.newTimeCheckBean());
+			throw new TimeoutException("Mining unsuccessful. Max iteration exceeded - "+BaseConfig.newTimeCheckBean());
 		
 		return b;
 	}
@@ -128,7 +129,7 @@ class BlockchainImpl implements Blockchain {
 	@Override
 	public synchronized Blockchain append(Node next) {
 		checkIfDiscarded();
-		boolean valid = HashUtil.isValid(next, tail.getHash());
+		boolean valid = Crypto.isValid(next, tail.getHash());
 		if(!valid)
 			throw new InvalidBlockException("Not a next linked block. mineBlock(..) again");
 		
@@ -156,7 +157,7 @@ class BlockchainImpl implements Blockchain {
 	public boolean verify() {
 		Node b = genesis;
 		while (b != null) {
-			if(!HashUtil.isValid(b))
+			if(!Crypto.isValid(b))
 				throw new InvalidChainException(chainName);
 			
 			b = b.getNext();

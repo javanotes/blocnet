@@ -1,15 +1,19 @@
 package org.reactiveminds.blocnet.core;
 
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import javax.annotation.PostConstruct;
+
+import org.reactiveminds.blocnet.api.BlocCommitListener;
+import org.reactiveminds.blocnet.api.BlocMiner;
 import org.reactiveminds.blocnet.api.BlocService;
 import org.reactiveminds.blocnet.api.ChainCache;
 import org.reactiveminds.blocnet.ds.Blockchain;
-import org.reactiveminds.blocnet.ds.HashUtil;
 import org.reactiveminds.blocnet.ds.Node;
 import org.reactiveminds.blocnet.dto.AddRequest;
 import org.reactiveminds.blocnet.dto.GetBlockResponse;
@@ -19,21 +23,22 @@ import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.model.BlockData;
 import org.reactiveminds.blocnet.model.BlockRef;
 import org.reactiveminds.blocnet.model.DataStore;
-import org.reactiveminds.blocnet.utils.InvalidBlockException;
-import org.reactiveminds.blocnet.utils.InvalidChainException;
-import org.reactiveminds.blocnet.utils.MiningTimeoutException;
+import org.reactiveminds.blocnet.utils.Crypto;
 import org.reactiveminds.blocnet.utils.SerdeUtil;
+import org.reactiveminds.blocnet.utils.err.InvalidBlockException;
+import org.reactiveminds.blocnet.utils.err.InvalidChainException;
+import org.reactiveminds.blocnet.utils.err.MiningTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
+import com.hazelcast.core.Message;
+import com.hazelcast.core.MessageListener;
 
-@Service
-class ServiceImpl implements BlocService {
+class DefaultBlocService implements BlocService {
 
 	private static final Logger log = LoggerFactory.getLogger("BlocService");
 	
@@ -44,6 +49,35 @@ class ServiceImpl implements BlocService {
 	DataStore db;
 	@Autowired
 	HazelcastInstance hazelcast;
+	private List<BlocCommitListener> listeners = Collections.synchronizedList(new LinkedList<>());
+	
+	/**
+	 * Handler invoked when a commit broadcast is received. By default it would
+	 * refresh the {@linkplain ChainCache} for this chain. Subclasses can override this default
+	 * behavior.
+	 */
+	private class CacheRefreshingListener implements BlocCommitListener{
+
+		@Override
+		public void onCommit(BlockData block) {
+			refreshCache(block.getChain());
+			log.info("New block notification processed for chain - "+block.getChain());
+		}
+		
+	}
+	@PostConstruct
+	private void setupCommitListener() {
+		hazelcast.<BlockData>getTopic(BlocMiner.COMMITNOTIF).addMessageListener(new MessageListener<BlockData>() {
+			
+			@Override
+			public void onMessage(Message<BlockData> message) {
+				synchronized (listeners) {
+					listeners.forEach(l -> l.onCommit(message.getMessageObject()));
+				}
+			}
+		});
+		listeners.add(new CacheRefreshingListener());
+	}
 	
 	@Override
 	public GetBlockResponse getChain(String name) {
@@ -127,9 +161,10 @@ class ServiceImpl implements BlocService {
 					Block b = blocs.stream().findFirst().get();
 					Node n = Blockchain.transform(b);
 
-					valid = HashUtil.isValid(n, b.getPrevHash());
+					valid = Crypto.isValid(n, b.getPrevHash());
 					if (!valid)
 						throw new InvalidBlockException(txnid);
+					
 					valid = chainCache.verify(chain, false);
 					if (!valid)
 						throw new InvalidChainException(chain);
@@ -146,6 +181,11 @@ class ServiceImpl implements BlocService {
 		}
 		
 		return new TxnRequest(txnid, new AddRequest());
+	}
+
+	@Override
+	public void addBlocCommitListener(BlocCommitListener listener) {
+		listeners.add(listener);
 	}
 
 }

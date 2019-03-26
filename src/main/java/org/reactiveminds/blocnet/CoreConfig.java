@@ -1,10 +1,9 @@
-package org.reactiveminds.blocnet.cfg;
+package org.reactiveminds.blocnet;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.Properties;
 
-import org.reactiveminds.blocnet.Bootstrap;
 import org.reactiveminds.blocnet.api.BlocMiner;
 import org.reactiveminds.blocnet.api.BlocService;
 import org.reactiveminds.blocnet.core.ScheduledBlocMiner;
@@ -18,8 +17,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
@@ -32,11 +40,48 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.MapLoader;
 import com.hazelcast.core.MapStoreFactory;
-
 @Configuration
+@EnableScheduling
+@EnableAsync
 @ConditionalOnProperty(name = "blocnet.miner", havingValue="true")
-class MinerConfig {
+/**
+ * Enabling this configuration makes this instance into a core mining node. No http support will 
+ * be provided, and this from architectural perspective, this can be considered as a serverless master node.
+ * @author Sutanu_Dalui
+ *
+ */
+class CoreConfig implements SchedulingConfigurer{
 
+	@Value("${chains.scheduler.poolSize:4}")
+	private int masterPoolSize;
+	@Value("${chains.executor.poolSize:10}")
+	private int workerPoolSize;
+	
+	@Override
+	public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+        taskRegistrar.setTaskScheduler(taskScheduler());
+	}
+	
+	@Lazy
+	@Bean
+	TaskScheduler taskScheduler() {
+		ThreadPoolTaskScheduler threadPoolTaskScheduler = new ThreadPoolTaskScheduler();
+        threadPoolTaskScheduler.setPoolSize(masterPoolSize);
+        threadPoolTaskScheduler.setThreadNamePrefix("BlocnetScheduler-");
+        threadPoolTaskScheduler.initialize();
+		return threadPoolTaskScheduler;
+	}
+	@Bean
+	AsyncTaskExecutor taskExecutor() {
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+		executor.setCorePoolSize(1);
+		executor.setMaxPoolSize(workerPoolSize);
+		executor.setQueueCapacity(0);
+		executor.setThreadNamePrefix("BlocnetExecutor-");
+		executor.initialize();
+		return executor;
+	}
+	
 	@Value("${chains.mine.executionMode:t}")
 	private String mode;
 	@Bean
@@ -78,7 +123,7 @@ class MinerConfig {
 			hasConfigXml = true;
 		}
 		final Config conf = getConfig(config);
-		conf.setProperty("hazelcast.rest.enabled", "true");
+		conf.setProperty("hazelcast.rest.enabled", "false");
 		
 		if (!hasConfigXml) {
 			NetworkConfig network = conf.getNetworkConfig();
@@ -114,5 +159,4 @@ class MinerConfig {
 	BlockRefMapStore mapStore() {
 		return new BlockRefMapStore();
 	}
-	
 }

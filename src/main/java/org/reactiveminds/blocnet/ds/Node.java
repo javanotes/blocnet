@@ -1,6 +1,8 @@
 package org.reactiveminds.blocnet.ds;
 
 import java.util.Optional;
+
+import org.reactiveminds.blocnet.utils.Crypto;
 /**
  * The block node
  * @author Sutanu_Dalui
@@ -46,7 +48,7 @@ public class Node {
 		return previous;
 	}
 	public String getPreviousHash() {
-		return Optional.ofNullable(previous).map(b -> b.hash).orElse(HashUtil.GENESIS_PREV_HASH);
+		return Optional.ofNullable(previous).map(b -> b.hash).orElse(Crypto.GENESIS_PREV_HASH);
 	}
 	public void setPrevious(Node previous) {
 		this.previous = previous;

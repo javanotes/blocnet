@@ -3,19 +3,16 @@ package org.reactiveminds.blocnet.core;
 import java.util.Deque;
 
 import org.reactiveminds.blocnet.api.ChainCache;
-import org.reactiveminds.blocnet.cfg.BaseConfig;
 import org.reactiveminds.blocnet.ds.Blockchain;
 import org.reactiveminds.blocnet.model.Block;
 import org.reactiveminds.blocnet.model.DataStore;
-import org.reactiveminds.blocnet.utils.InvalidChainException;
+import org.reactiveminds.blocnet.utils.err.InvalidChainException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.stereotype.Component;
 
-@Component
-class ChainCacheImpl implements ChainCache {
+class DefaultChainCache implements ChainCache {
 
 	@Autowired
 	DataStore db;
