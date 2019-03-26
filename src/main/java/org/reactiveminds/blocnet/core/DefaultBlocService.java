@@ -81,7 +81,7 @@ class DefaultBlocService implements BlocService {
 	
 	@Override
 	public GetBlockResponse getChain(String name) {
-		Blockchain chain = chainCache.getOrLoad(name);
+		Blockchain chain = chainCache.getOrLoad(name).getItem();
 		if(chain.getSize() == -1)
 		{
 			GetBlockResponse resp = new GetBlockResponse(Collections.emptyList());
@@ -111,7 +111,7 @@ class DefaultBlocService implements BlocService {
 
 	@Override
 	public Node mineBlock(String chainId, String blockData) {
-		Blockchain chain = chainCache.getOrLoad(chainId);
+		Blockchain chain = chainCache.getOrLoad(chainId).getItem();
 		//chain will never be null
 		Node n;
 		try {
@@ -124,7 +124,7 @@ class DefaultBlocService implements BlocService {
 	}
 	@Override
 	public Block appendBlock(String chain, Node n) throws InvalidBlockException, InvalidChainException {
-		Blockchain b = chainCache.getOrLoad(chain);
+		Blockchain b = chainCache.getOrLoad(chain).getItem();
 		b.append(n);
 		b.verify();
 		if (log.isDebugEnabled()) {

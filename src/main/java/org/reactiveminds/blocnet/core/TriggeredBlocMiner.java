@@ -43,7 +43,7 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 	@PostConstruct
 	private void init() {
 		requests = new ArrayBlockingQueue<>(maxBlockElements);
-		globalMemPool().addLocalEntryListener(this, new TxnPredicate.MatchAllTxnPredicate(), false);
+		getMemoryPool().addLocalEntryListener(this, new TxnPredicate.MatchAllTxnPredicate(), false);
 	}
 	@Override
 	public void run() {
@@ -63,7 +63,7 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 
 	@Override
 	protected List<TxnRequest> fetchMempool() {
-		return globalMemPool().localKeySet().stream().filter(s -> requests.remove(s)).map(s -> mempoolEntry(s))
+		return getMemoryPool().localKeySet().stream().filter(s -> requests.remove(s)).map(s -> getMemoryPoolEntry(s))
 				.collect(Collectors.toList());
 	}
 
@@ -87,5 +87,4 @@ public class TriggeredBlocMiner extends AbstractBlocMiner implements BlocMiner,S
 			entryAdded(event);
 		}
 	}
-
 }

@@ -42,26 +42,34 @@ abstract class AbstractBlocMiner implements BlocMiner {
 	@Value("${chain.mine.awaitChainLockSecs:10}")
 	private long awaitChainLock;
 	@Autowired
-	BlocService service;
+	private BlocService service;
 	@Autowired
-	HazelcastInstance hazelcast;
+	private HazelcastInstance hazelcast;
 	@Autowired
-	AsyncTaskExecutor taskExecutor;
+	private AsyncTaskExecutor taskExecutor;
 	
 	private void removeMempool(BlockData chainPool) {
 		//remove the committed transactions from the global mempool
 		Set<TxnRequest> keys = new HashSet<>(chainPool.getRequests());
-		globalMemPool().removeAll(new TxnPredicate.RemoveTxnPredicate(keys));
+		getMemoryPool().removeAll(new TxnPredicate.RemoveTxnPredicate(keys));
 	}
-	IMap<String, TxnRequest> globalMemPool() {
+	
+	@Override
+	public IMap<String, TxnRequest> getMemoryPool() {
 		return hazelcast.<String, TxnRequest>getMap(MEMPOOL);
 	}
 	@PostConstruct
 	private void setupCommitListener() {
 		log.info("Mine worker setup done. Ready to run ..");
 	}
-	TxnRequest mempoolEntry(String key) {
-		return Optional.ofNullable(globalMemPool().get(key)).orElse(new TxnRequest(key, new AddRequest()));
+	/**
+	 * get a transaction from the memory pool
+	 * @param key
+	 * @return
+	 */
+	@Override
+	public TxnRequest getMemoryPoolEntry(String key) {
+		return Optional.ofNullable(getMemoryPool().get(key)).orElse(new TxnRequest(key, new AddRequest()));
 	}
 	/**
 	 * Get a mempool snapshot for this mining task. Subclasses will

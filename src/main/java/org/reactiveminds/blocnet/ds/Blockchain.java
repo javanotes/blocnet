@@ -22,12 +22,16 @@ public interface Blockchain extends Iterable<Block>{
 	public static Blockchain newInstance(int challengeLevel) {
 		return new BlockchainImpl(challengeLevel);
 	}
+	final static Blockchain NIL = new BlockchainImpl(0) {
+		public int getSize() {
+			return -1;
+		}
+	};
+	public static boolean isEmptyChain(Blockchain b) {
+		return b == NIL;
+	}
 	public static Blockchain emptyChain() {
-		return new BlockchainImpl(0) {
-			public int getSize() {
-				return -1;
-			}
-		};
+		return NIL;
 	}
 	public static Node transform(Block bloc) {
 		Node block = new Node();

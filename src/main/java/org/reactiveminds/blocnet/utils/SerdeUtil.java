@@ -1,6 +1,7 @@
 package org.reactiveminds.blocnet.utils;
 
 import java.io.IOException;
+import java.util.Base64;
 
 import org.springframework.core.serializer.support.SerializationFailedException;
 
@@ -41,5 +42,13 @@ public class SerdeUtil {
 		} catch (IOException e) {
 			throw new SerializationFailedException(e.getMessage());
 		}
+	}
+	
+	public static String encodeBytes(byte[] b) {
+		return Base64.getEncoder().encodeToString(b);
+	}
+	
+	public static byte[] decodeBytes(String bytes) {
+		return Base64.getDecoder().decode(bytes);
 	}
 }

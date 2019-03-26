@@ -18,12 +18,12 @@ public class ScheduledBlocMiner extends AbstractBlocMiner implements BlocMiner{
 	@Override
 	protected boolean isCommitReady() {
 		//TODO isCommitThresholdReached
-		return !globalMemPool().isEmpty();
+		return !getMemoryPool().isEmpty();
 		
 	}
 	@Override
 	protected List<TxnRequest> fetchMempool() {
-		return globalMemPool().localKeySet().stream().map(s -> mempoolEntry(s))
+		return getMemoryPool().localKeySet().stream().map(s -> getMemoryPoolEntry(s))
 				.collect(Collectors.toList());
 	}
 	/* (non-Javadoc)
@@ -45,5 +45,4 @@ public class ScheduledBlocMiner extends AbstractBlocMiner implements BlocMiner{
 	public void setMaxBlockElements(int maxBlockElements) {
 		this.maxBlockElements = maxBlockElements;
 	}
-	
 }

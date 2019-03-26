@@ -1,7 +1,12 @@
 package org.reactiveminds.blocnet.api;
 
-import org.reactiveminds.blocnet.ds.Blockchain;
+import org.reactiveminds.blocnet.core.CachedBlockchain;
 
+/**
+ * Local in memory repository for active blockchains
+ * @author Sutanu_Dalui
+ *
+ */
 public interface ChainCache {
 
 	/**
@@ -9,13 +14,13 @@ public interface ChainCache {
 	 * @param name
 	 * @return
 	 */
-	Blockchain getOrLoad(String name);
+	CachedBlockchain getOrLoad(String name);
 
 	/**
 	 * (re)load a chain from the data store
 	 * @param chain
 	 */
-	Blockchain refresh(String chain);
+	CachedBlockchain refresh(String chain);
 
 	/**
 	 * Verify a given chain, by optionally (re)loading it from data store.

@@ -11,7 +11,11 @@ import org.reactiveminds.blocnet.model.BlockRef;
 import org.reactiveminds.blocnet.utils.err.InvalidBlockException;
 import org.reactiveminds.blocnet.utils.err.InvalidChainException;
 import org.reactiveminds.blocnet.utils.err.MiningTimeoutException;
-
+/**
+ * Core service facade for blocnet operations
+ * @author Sutanu_Dalui
+ *
+ */
 public interface BlocService {
 
 	String REF_TABLE_PATTERN = "__ref_";
@@ -25,9 +29,6 @@ public interface BlocService {
 		if(name.startsWith(REF_TABLE_PATTERN)) {
 			return name.substring(REF_TABLE_PATTERN.length());
 		}
-		/*if(name.endsWith(REF_TABLE_PATTERN)) {
-			return name.substring(0, name.indexOf(REF_TABLE_PATTERN));
-		}*/
 		return name;
 	}
 	/**
