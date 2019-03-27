@@ -5,6 +5,7 @@ import java.util.Observer;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ExpiryNotifier extends Observable implements Runnable{
 	/**
@@ -30,7 +31,13 @@ public class ExpiryNotifier extends Observable implements Runnable{
 	public void stop() {
 		evictQueue.offer(poisonPill);
 	}
-	
+	private AtomicBoolean started = new AtomicBoolean();
+	/**
+	 * Starts this notifier in a new thread, only if it is not already running.
+	 */
+	public void start() {
+		new Thread(this, "ExpiryNotifierRunner").start();
+	}
 	/**
 	 * Register a new item to be notified on expiration.
 	 * @param <T>
@@ -56,7 +63,8 @@ public class ExpiryNotifier extends Observable implements Runnable{
 	}
 	@Override
 	public void run() {
-		while(true) {
+		boolean willRun = started.compareAndSet(false, true);
+		while(willRun) {
 			try 
 			{
 				PerishableItem item = evictQueue.take();
@@ -73,7 +81,6 @@ public class ExpiryNotifier extends Observable implements Runnable{
 				Thread.currentThread().interrupt();
 			}
 		}
-		
 	}
 	/**
 	 * Wrapper class for a {@linkplain Perishable} item.
@@ -141,7 +148,7 @@ public class ExpiryNotifier extends Observable implements Runnable{
 	}
 	public static void main(String[] args) {
 		ExpiryNotifier notif = new ExpiryNotifier();
-		new Thread(notif).start();
+		notif.start();
 		notif.register(new SomePerishableCommodity("[1]"), 5, TimeUnit.SECONDS);
 		notif.register(new SomePerishableCommodity("[2]"), 1, TimeUnit.SECONDS);
 		//notif.stop();
