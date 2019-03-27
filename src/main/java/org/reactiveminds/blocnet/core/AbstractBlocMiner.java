@@ -39,8 +39,10 @@ abstract class AbstractBlocMiner implements BlocMiner {
 
 	final Logger log = LoggerFactory.getLogger(getClass().getSimpleName());
 	
-	@Value("${chain.mine.awaitChainLockSecs:10}")
+	@Value("${chains.mine.awaitChainLockSecs:10}")
 	private long awaitChainLock;
+	@Value("${chains.mine.priorRefresh.enable:false}")
+	private boolean priorRefresh;
 	@Autowired
 	private BlocService service;
 	@Autowired
@@ -164,9 +166,13 @@ abstract class AbstractBlocMiner implements BlocMiner {
 			Node minedBloc;
 			try 
 			{
-				String blockData = SerdeUtil.toJson(chainPool);
-				// mine next block
-				service.refreshCache(chain);
+				// this is the main serialization point
+				byte[] blockData = SerdeUtil.toBytes(chainPool);
+				
+				if (priorRefresh) {
+					// mine next block. can we skip this refresh?
+					service.refreshCache(chain);
+				}
 				minedBloc = service.mineBlock(chain, blockData);
 				log.info("["+chain+"] Found golden nonce");
 				

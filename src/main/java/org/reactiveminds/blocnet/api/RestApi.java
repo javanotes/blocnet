@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.reactiveminds.blocnet.dto.AddRequest;
 import org.reactiveminds.blocnet.dto.AddTxnResponse;
 import org.reactiveminds.blocnet.dto.GetBlockResponse;
+import org.reactiveminds.blocnet.dto.GetRawResponse;
 import org.reactiveminds.blocnet.dto.GetTxnResponse;
 import org.reactiveminds.blocnet.dto.Response;
 import org.reactiveminds.blocnet.dto.TxnRequest;
@@ -65,9 +66,36 @@ public class RestApi {
 			rep.setTxnId(txn.getTxnId());
 			rep.setStatus(Response.NOT_FOUND);
 			
-			if(StringUtils.hasText(txn.getRequest())) {
+			if(!txn.isRaw() && StringUtils.hasText(txn.getRequest())) {
 				resp.setStatus(HttpStatus.OK.value());
 				rep.setBody(txn.getRequest());
+				rep.setChainId(name);
+				rep.setStatus(Response.OK);
+			}
+			
+		} catch (IllegalLinkException e) {
+			log.error(e.toString());
+			resp.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+			rep.setStatus(Response.INVALID_BLOCKCHAIN);
+		}
+		
+		return rep;
+	}
+	@GetMapping("/chain/{name}/{txnid}/raw")
+	public GetRawResponse getTransactionRaw(@PathVariable String name, @PathVariable String txnid, HttpServletResponse resp) {
+		GetRawResponse rep = new GetRawResponse();
+		rep.setTxnId(txnid);
+		
+		try 
+		{
+			TxnRequest txn = service.fetchTransaction(name, txnid);
+			resp.setStatus(HttpStatus.NOT_FOUND.value());
+			rep.setTxnId(txn.getTxnId());
+			rep.setStatus(Response.NOT_FOUND);
+			
+			if(txn.isRaw()) {
+				resp.setStatus(HttpStatus.OK.value());
+				rep.setBody(txn.getRequestRaw());
 				rep.setChainId(name);
 				rep.setStatus(Response.OK);
 			}
@@ -83,6 +111,15 @@ public class RestApi {
 	@PostMapping("/chain/{name}")
 	public AddTxnResponse postTransaction(@PathVariable String name, @RequestBody String payload, HttpServletResponse resp) {
 		String txnid = service.addTransaction(new AddRequest(payload, name));
+		AddTxnResponse trep = new AddTxnResponse();
+		trep.setChainId(name);
+		trep.setStatus(Response.TXN_ACCEPT);
+		trep.setTxnId(txnid);
+		return trep;
+	}
+	@PostMapping("/chain/{name}/raw")
+	public AddTxnResponse postTransactionRaw(@PathVariable String name, @RequestBody byte[] payload, HttpServletResponse resp) {
+		String txnid = service.addTransaction(payload, name);
 		AddTxnResponse trep = new AddTxnResponse();
 		trep.setChainId(name);
 		trep.setStatus(Response.TXN_ACCEPT);

@@ -22,7 +22,7 @@ class BlockchainImpl implements Blockchain {
 	public String toString() {
 		return "Blockchain [chainName=" + chainName + ", blocks=" + print() + "]";
 	}
-	private static final String GENESIS = "$genesis";
+	private static final byte[] GENESIS = new byte[0];//"$genesis".getBytes(StandardCharsets.UTF_8);
 	private final String chainName;
 	/* (non-Javadoc)
 	 * @see org.reactiveminds.hazelblock.ds.IBlockchain#getChainName()
@@ -66,11 +66,11 @@ class BlockchainImpl implements Blockchain {
 		}
 	}
 	/**
-	 * Create a new chain
+	 * Create the 'default' chain
 	 * @param challengeLevel
 	 */
 	BlockchainImpl(int challengeLevel) {
-		this(GENESIS, challengeLevel);
+		this("default", challengeLevel);
 	}
 	private BlockchainImpl(String name, int challengeLevel, Node genesis) {
 		this(name, Crypto.toRepeatingIntString(0, challengeLevel), genesis);
@@ -114,7 +114,7 @@ class BlockchainImpl implements Blockchain {
 	 * @see org.reactiveminds.hazelblock.ds.IBlockchain#mine(java.lang.String)
 	 */
 	@Override
-	public Node mine(String data) throws TimeoutException {
+	public Node mine(byte[] data) throws TimeoutException {
 		Node b = new Node(data);
 		b.setPrevious(tail);
 		boolean done = Crypto.generateHash(b, challenge, BaseConfig.newTimeCheckBean());

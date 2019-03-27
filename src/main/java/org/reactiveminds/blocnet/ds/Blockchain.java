@@ -1,6 +1,5 @@
 package org.reactiveminds.blocnet.ds;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Deque;
 import java.util.concurrent.TimeoutException;
 
@@ -35,7 +34,7 @@ public interface Blockchain extends Iterable<Block>{
 	}
 	public static Node transform(Block bloc) {
 		Node block = new Node();
-		block.setData(new String(bloc.getPayload(), StandardCharsets.UTF_8));
+		block.setData(bloc.getPayload());
 		block.setHash(bloc.getCurrHash());
 		block.setNonce(bloc.getNonce());
 		block.setTimstamp(bloc.getTimestamp());
@@ -45,7 +44,7 @@ public interface Blockchain extends Iterable<Block>{
 		Block block = new Block();
 		block.setCurrHash(bloc.getHash());
 		block.setNonce(bloc.getNonce());
-		block.setPayload(bloc.getData().getBytes(StandardCharsets.UTF_8));
+		block.setPayload(bloc.getData());
 		block.setPrevHash(bloc.getPreviousHash());
 		block.setTimestamp(bloc.getTimstamp());
 		block.setChain(chainName);
@@ -68,7 +67,7 @@ public interface Blockchain extends Iterable<Block>{
 	 * @return
 	 * @throws TimeoutException 
 	 */
-	Node mine(String data) throws TimeoutException;
+	Node mine(byte[] data) throws TimeoutException;
 
 	/**
 	 * Append next block

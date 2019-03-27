@@ -59,7 +59,7 @@ public final class Crypto {
 		Assert.isTrue(StringUtils.hasText(block.getPreviousHash()), "Prev hash is blank or null");
 		MessageDigest digestor = digestors.get();
 		digestor.reset();
-		digestor.update(block.getData().getBytes(StandardCharsets.UTF_8));
+		digestor.update(block.getData());
 		digestor.update(prevHash.getBytes(StandardCharsets.UTF_8));
 		if (generateNonce) {
 			block.setNonce(Math.abs(nonceGen.nextLong()));

@@ -17,13 +17,13 @@ public class Node {
 	}
 	Node() {
 	}
-	Node(String data) {
+	Node(byte[] data) {
 		this.data = data;
 	}
-	public String getData() {
+	public byte[] getData() {
 		return data;
 	}
-	public void setData(String data) {
+	public void setData(byte[] data) {
 		this.data = data;
 	}
 	public long getNonce() {
@@ -59,7 +59,7 @@ public class Node {
 	public void setNext(Node next) {
 		this.next = next;
 	}
-	private String data;
+	private byte[] data;
 	private long nonce;
 	private long timstamp = System.currentTimeMillis();
 	private String hash;

@@ -97,7 +97,7 @@ class DefaultBlocService implements BlocService {
 	}
 
 	@Override
-	public Node mineBlock(String chainId, String blockData) {
+	public Node mineBlock(String chainId, byte[] blockData) {
 		Blockchain chain = chainCache.getOrLoad(chainId).getItem();
 		//chain will never be null
 		Node n;
@@ -168,5 +168,15 @@ class DefaultBlocService implements BlocService {
 		}
 		
 		return new TxnRequest(txnid, new AddRequest());
+	}
+
+	@Override
+	public String addTransaction(byte[] request, String chain) {
+		HazelcastInstance hazel = beans.getBean(HazelcastInstance.class);
+		String txnId = Long.toHexString(hazelcast.getFlakeIdGenerator(chain).newId());
+		TxnRequest txn = new TxnRequest(txnId, chain, request);
+		hazel.getMap(ScheduledBlocMiner.MEMPOOL).set(txn.getPartitionKey(), txn);
+		
+		return txnId;
 	}
 }

@@ -44,7 +44,7 @@ public interface BlocService {
 	 * @return
 	 * @throws TimeoutException 
 	 */
-	Node mineBlock(String chain, String blockData) throws MiningTimeoutException;
+	Node mineBlock(String chain, byte[] blockData) throws MiningTimeoutException;
 	/**
 	 * 
 	 * @param chain
@@ -59,6 +59,7 @@ public interface BlocService {
 	 * @return
 	 */
 	String addTransaction(AddRequest request);
+	String addTransaction(byte[] request, String chain);
 	/**
 	 * 
 	 * @param id

@@ -64,33 +64,71 @@ public class TxnRequest implements Serializable, DataSerializable, PartitionAwar
 	public TxnRequest() {
 	}
 	
+	public void setChain(String chain) {
+		this.chain = chain;
+	}
+
 	private String txnId;
 	private String request;
 	private String chain;
-	
+	private byte[] requestRaw;
+	private boolean isRaw = false;
+	/**
+	 * Request for string payload
+	 * @param txnId
+	 * @param request
+	 */
 	public TxnRequest(String txnId, AddRequest request) {
 		super();
 		this.txnId = txnId;
 		this.request = request.getPayloadJson();
 		this.chain = request.getChainId();
 	}
+	/**
+	 * Request for raw bytes
+	 * @param txnId
+	 * @param chain
+	 * @param raw
+	 */
+	public TxnRequest(String txnId, String chain, byte[] raw) {
+		super();
+		this.txnId = txnId;
+		this.chain = chain;
+		this.isRaw = true;
+	}
 
 	@Override
 	public void writeData(ObjectDataOutput out) throws IOException {
-		out.writeUTF(request);
 		out.writeUTF(chain);
 		out.writeUTF(txnId);
+		out.writeBoolean(isRaw);
+		if(isRaw)
+			out.write(requestRaw);
+		else
+			out.writeUTF(request);
 	}
 
 	@Override
 	public void readData(ObjectDataInput in) throws IOException {
-		request = in.readUTF();
 		chain = in.readUTF();
 		txnId = in.readUTF();
+		isRaw = in.readBoolean();
+		if(isRaw)
+			requestRaw = in.readByteArray();
+		else
+			request = in.readUTF();
 	}
 	public static final char KEY_SEP = '#';
 	@Override
 	public String getPartitionKey() {
 		return getChain()+KEY_SEP+getTxnId();
+	}
+
+	public boolean isRaw() {
+		return isRaw;
+	}
+
+	public byte[] getRequestRaw() {
+		return requestRaw;
 	}
 }
