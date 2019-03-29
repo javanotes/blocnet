@@ -25,9 +25,10 @@ public interface DataStore {
 	/**
 	 * Fetch a chain by its name
 	 * @param name
+	 * @param includeBlock
 	 * @return
 	 */
-	Deque<Block> loadChain(String name);
+	Deque<Block> loadChain(String name, boolean includeBlock);
 	/**
 	 * Fetch block/s for a given chain and hash key/s
 	 * @param name

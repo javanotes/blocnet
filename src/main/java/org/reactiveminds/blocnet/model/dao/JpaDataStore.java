@@ -42,24 +42,25 @@ class JpaDataStore implements DataStore {
 	}
 	
 	@Override
-	public Deque<Block> loadChain(String name) {
-		return loadFromBeginning(name);
+	public Deque<Block> loadChain(String name, boolean include) {
+		return loadFromBeginning(name, include);
 	}
-	private LinkedList<Block> loadFromBeginning(String name) {
-		return loadSlice(name, Crypto.GENESIS_PREV_HASH, null);
+	private LinkedList<Block> loadFromBeginning(String name, boolean include) {
+		return loadSlice(name, Crypto.GENESIS_PREV_HASH, null, include);
 	}
 	private LinkedList<Block> loadFromOffset(String name, String hash) {
-		return loadSlice(name, hash, null);
+		return loadSlice(name, hash, null, false);
 	}
 	/**
 	 * Slice chain with the given hash offsets
 	 * @param name chain name
 	 * @param fromHash load chain from the next link after this (exclusive)
 	 * @param tillHash load chain till this link (inclusive)
+	 * @param include whether to fetch the payload as well
 	 * @return
 	 */
-	private LinkedList<Block> loadSlice(String name, String fromHash, String tillHash) {
-		List<Block> blocks = repo.findByChain(name);
+	private LinkedList<Block> loadSlice(String name, String fromHash, String tillHash, boolean include) {
+		List<Block> blocks = include ? repo.findByChain(name) : repo.findByChainLite(name);
 		if(blocks == null || blocks.isEmpty())
 			return new LinkedList<Block>();
 		

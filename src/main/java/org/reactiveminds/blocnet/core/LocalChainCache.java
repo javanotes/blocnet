@@ -20,8 +20,13 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-
-class DefaultChainCache implements ChainCache {
+/**
+ * A local cache of {@linkplain Blockchain}, using default Spring caching. By default evicts
+ * chains after 60 seconds to conserve memory. 
+ * @author Sutanu_Dalui
+ *
+ */
+class LocalChainCache implements ChainCache {
 
 	@Autowired
 	DataStore db;
@@ -61,10 +66,10 @@ class DefaultChainCache implements ChainCache {
 	 * @return
 	 * @throws InvalidChainException
 	 */
-	private Blockchain load(String name, boolean autocreate) throws InvalidChainException {
+	private Blockchain load(String name, boolean autocreate, boolean include) throws InvalidChainException {
 		Deque<Block> loaded;
 		try {
-			loaded = db.loadChain(name);
+			loaded = db.loadChain(name, include);
 		} catch (IllegalStateException e) {
 			throw new InvalidChainException("Duplicate prev_hash detected", e);
 		}
@@ -91,7 +96,7 @@ class DefaultChainCache implements ChainCache {
 	@Override
 	@Cacheable(cacheNames = BaseConfig.BLOCKCHAIN_CACHE)
 	public CachedBlockchain getOrLoad(String name) {
-		CachedBlockchain c = new CachedBlockchain(load(name, true), TimeUnit.SECONDS.toMillis(ttl));
+		CachedBlockchain c = new CachedBlockchain(load(name, true, true), TimeUnit.SECONDS.toMillis(ttl));
 		evictQueue.offer(c);
 		return c;
 	}
@@ -102,7 +107,7 @@ class DefaultChainCache implements ChainCache {
 	@CachePut(cacheNames = BaseConfig.BLOCKCHAIN_CACHE)
 	public CachedBlockchain refresh(String chain) {
 		evictQueue.remove(CachedBlockchain.withName(chain));
-		CachedBlockchain c = new CachedBlockchain(load(chain, false), TimeUnit.SECONDS.toMillis(ttl));
+		CachedBlockchain c = new CachedBlockchain(load(chain, false, true), TimeUnit.SECONDS.toMillis(ttl));
 		evictQueue.offer(c);
 		return c;
 	}
@@ -116,4 +121,8 @@ class DefaultChainCache implements ChainCache {
 	}
 	@CacheEvict(cacheNames = BaseConfig.BLOCKCHAIN_CACHE)
 	public void expire(String name) {}
+	@Override
+	public Blockchain fetch(String name) {
+		return load(name, false, false);
+	}
 }

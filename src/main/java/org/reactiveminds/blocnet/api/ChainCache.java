@@ -1,6 +1,7 @@
 package org.reactiveminds.blocnet.api;
 
 import org.reactiveminds.blocnet.core.CachedBlockchain;
+import org.reactiveminds.blocnet.ds.Blockchain;
 
 /**
  * Local in memory repository for active blockchains
@@ -8,7 +9,13 @@ import org.reactiveminds.blocnet.core.CachedBlockchain;
  *
  */
 public interface ChainCache {
-
+	/**
+	 * A light version of get(), that will not pull the payload,
+	 * however, will refer to database.
+	 * @param name
+	 * @return
+	 */
+	Blockchain fetch(String name);
 	/**
 	 * Get or load
 	 * @param name

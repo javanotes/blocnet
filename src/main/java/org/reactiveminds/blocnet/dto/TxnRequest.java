@@ -94,6 +94,7 @@ public class TxnRequest implements Serializable, DataSerializable, PartitionAwar
 		super();
 		this.txnId = txnId;
 		this.chain = chain;
+		this.requestRaw = raw;
 		this.isRaw = true;
 	}
 
@@ -123,7 +124,9 @@ public class TxnRequest implements Serializable, DataSerializable, PartitionAwar
 	public String getPartitionKey() {
 		return getChain()+KEY_SEP+getTxnId();
 	}
-
+	public static String makePartitionKey(String chain, String txnId) {
+		return chain+KEY_SEP+txnId;
+	}
 	public boolean isRaw() {
 		return isRaw;
 	}

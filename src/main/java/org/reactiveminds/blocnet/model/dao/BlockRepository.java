@@ -21,6 +21,8 @@ public interface BlockRepository extends CrudRepository<Block, Long> {
 	String findLastHash();
 	
 	List<Block> findByChain(String chain);
+	@Query("select b.id, b.chain, b.timestamp, b.nonce, b.prevHash, b.currHash from Block b where b.chain=?1")
+	List<Block> findByChainLite(String chain);
 	
 	/**
 	 * @deprecated mysql 5.6 does not support CTE (connect with prior)

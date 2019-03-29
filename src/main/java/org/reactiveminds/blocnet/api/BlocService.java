@@ -18,16 +18,21 @@ import org.reactiveminds.blocnet.utils.err.MiningTimeoutException;
  */
 public interface BlocService {
 
-	String REF_TABLE_PATTERN = "__ref_";
+	String REF_CACHE_PATTERN = "__ref_";
+	String TXN_CACHE_PATTERN = "__txn_";
+	
 	public static String refTablePattern() {
-		return REF_TABLE_PATTERN+"*";
+		return REF_CACHE_PATTERN+"*";
 	}
 	public static String getRefTableName(String chain) {
-		return REF_TABLE_PATTERN+chain;
+		return REF_CACHE_PATTERN+chain;
+	}
+	public static String getTxnCacheName(String chain) {
+		return TXN_CACHE_PATTERN+chain;
 	}
 	public static String chainFromRefTableName(String name) {
-		if(name.startsWith(REF_TABLE_PATTERN)) {
-			return name.substring(REF_TABLE_PATTERN.length());
+		if(name.startsWith(REF_CACHE_PATTERN)) {
+			return name.substring(REF_CACHE_PATTERN.length());
 		}
 		return name;
 	}

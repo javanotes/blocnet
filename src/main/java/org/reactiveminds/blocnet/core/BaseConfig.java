@@ -36,7 +36,7 @@ public class BaseConfig implements ApplicationContextAware{
 	}
 	@Bean
 	ChainCache cache() {
-		return new DefaultChainCache();
+		return new LocalChainCache();
 	}
 	@Bean
 	@Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)

@@ -23,6 +23,7 @@ import org.reactiveminds.blocnet.model.BlockRef;
 import org.reactiveminds.blocnet.model.DataStore;
 import org.reactiveminds.blocnet.utils.Crypto;
 import org.reactiveminds.blocnet.utils.SerdeUtil;
+import org.reactiveminds.blocnet.utils.err.IllegalLinkException;
 import org.reactiveminds.blocnet.utils.err.InvalidBlockException;
 import org.reactiveminds.blocnet.utils.err.InvalidChainException;
 import org.reactiveminds.blocnet.utils.err.MiningTimeoutException;
@@ -78,7 +79,7 @@ class DefaultBlocService implements BlocService {
 		if(!chain.verify())
 			throw new InvalidChainException(name);
 		
-		List<Block> blocks = StreamSupport.stream(chain.spliterator(), false).collect(Collectors.toList());
+		List<Block> blocks = StreamSupport.stream(chain.spliterator(), false).map(b -> {b.setPayload(new byte[0]);return b;}).collect(Collectors.toList());
 		return new GetBlockResponse(blocks);
 	}
 
@@ -132,39 +133,53 @@ class DefaultBlocService implements BlocService {
 		db.save(ref);
 	}
 
+	private TxnRequest fetchTransaction(String chain, String txnid, BlockRef ref) {
+		List<Block> blocs = db.findBlock(chain, ref.getHash());
+		boolean valid;
+		if (!blocs.isEmpty()) 
+		{
+			Block b = blocs.stream().findFirst().get();
+			Node n = Blockchain.transform(b);
+
+			valid = Crypto.isValid(n, b.getPrevHash());
+			if (!valid)
+				throw new InvalidBlockException(txnid);
+			
+			valid = chainCache.verify(chain, false);
+			if (!valid)
+				throw new InvalidChainException(chain);
+
+			BlockData data = SerdeUtil.fromBytes(b.getPayload(), BlockData.class);
+			return data.findTxn(txnid);
+		}
+		
+		return new TxnRequest(txnid, new AddRequest());
+	}
 	@Override
 	public TxnRequest fetchTransaction(String chain, String txnid) {
 		IMap<String, BlockRef> cache = hazelcast.getMap(BlocService.getRefTableName(chain));
 		BlockRef ref = cache.get(txnid);
-		if (ref != null) {
-			boolean valid = ref.isValid();
-			if (!valid)
+		if (ref != null) 
+		{
+			if (!ref.isValid()) {
 				throw new InvalidBlockException(txnid);
+			}
 			
-			List<Block> blocs = db.findBlock(chain, ref.getHash());
-			try 
-			{
-				if (!blocs.isEmpty()) {
-					Block b = blocs.stream().findFirst().get();
-					Node n = Blockchain.transform(b);
-
-					valid = Crypto.isValid(n, b.getPrevHash());
-					if (!valid)
-						throw new InvalidBlockException(txnid);
-					
-					valid = chainCache.verify(chain, false);
-					if (!valid)
-						throw new InvalidChainException(chain);
-
-					BlockData data = SerdeUtil.fromBytes(b.getPayload(), BlockData.class);
-					return data.findTxn(txnid);
+			IMap<String, TxnRequest> txnCache = hazelcast.getMap(BlocService.getTxnCacheName(chain));
+			if(!txnCache.containsKey(txnid)) {
+				try 
+				{
+					TxnRequest txn = fetchTransaction(chain, txnid, ref); 
+					txnCache.set(txnid, txn);
 				} 
-			} finally {
-				if(!valid) {
+				catch(IllegalLinkException e) {
 					ref.setValid(false);
 					saveBlockRef(ref);
+					throw e;
 				}
-			} 
+			}
+			
+			return txnCache.get(txnid);
 		}
 		
 		return new TxnRequest(txnid, new AddRequest());

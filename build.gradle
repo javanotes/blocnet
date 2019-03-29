@@ -26,6 +26,8 @@ dependencies {
     implementation('org.springframework.boot:spring-boot-starter-web')
     implementation('com.hazelcast:hazelcast:3.11')
     implementation('com.hazelcast:hazelcast-client:3.11')
+    implementation('com.esotericsoftware:kryo:5.0.0-RC2')
+    
     // JPA Data (We are going to use Repositories, Entities, Hibernate, etc...)
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     // Use MySQL Connector-J

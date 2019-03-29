@@ -22,13 +22,19 @@ public class BlockRefMapStore implements MapStore<String, BlockRef> {
 
 	@Override
 	public BlockRef load(String key) {
+		//System.out.println("BlockRefMapStore.load() key: "+key);
+		//System.out.println("BlockRefMapStore.load() mapName: "+mapName);
 		String chain = BlocService.chainFromRefTableName(mapName);
+		//System.out.println("BlockRefMapStore.load() chain: "+chain);
 		return repo.findByChainAndTxnid(chain, key);
 	}
 
 	@Override
 	public Map<String, BlockRef> loadAll(Collection<String> keys) {
+		//System.out.println("BlockRefMapStore.loadAll() keys: "+keys);
+		//System.out.println("BlockRefMapStore.loadAll() mapName: "+mapName);
 		String chain = BlocService.chainFromRefTableName(mapName);
+		//System.out.println("BlockRefMapStore.loadAll() chain: "+chain);
 		return repo.findByChainAndTxnidIn(chain, new ArrayList<>(keys)).stream().collect(Collectors.toMap(BlockRef::getTxnid, Function.identity()));
 	}
 
@@ -39,6 +45,7 @@ public class BlockRefMapStore implements MapStore<String, BlockRef> {
 
 	@Override
 	public void store(String key, BlockRef value) {
+		System.out.println("BlockRefMapStore.store() key: "+key);
 		repo.save(value);
 	}
 

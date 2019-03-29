@@ -167,7 +167,7 @@ abstract class AbstractBlocMiner implements BlocMiner {
 			try 
 			{
 				// this is the main serialization point
-				byte[] blockData = SerdeUtil.toBytes(chainPool);
+				byte[] blockData = SerdeUtil.toBlockBytes(chainPool);
 				
 				if (priorRefresh) {
 					// mine next block. can we skip this refresh?
